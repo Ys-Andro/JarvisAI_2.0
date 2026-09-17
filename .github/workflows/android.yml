@@ -96,7 +96,7 @@ jobs:
       - name: Build Debug APK
         run: |
           echo "Building Debug APK using installed Gradle..."
-          gradle :app:assembleDebug --stacktrace --no-daemon
+          gradle :app:assembleDebug --stacktrace --info --no-daemon
 
       # 8. Compile Release APK (Optional)
       - name: Build Release APK
