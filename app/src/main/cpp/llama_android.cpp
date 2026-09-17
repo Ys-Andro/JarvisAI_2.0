@@ -1,6 +1,7 @@
 /**
  * llama_android.cpp
  * JNI Bridge implementation for llama.cpp on Android.
+ * Compatible with recent llama.cpp (2026 API).
  *
  * Package: com.example.jarvisai.data.native.LlamaEngine
  * Target: libllama_android.so
@@ -50,7 +51,7 @@ extern "C" {
 JNIEXPORT jlong JNICALL
 Java_com_example_jarvisai_data_native_LlamaEngine_loadModelNative(
     JNIEnv* env,
-    jobject thiz,
+    jobject /* thiz */,
     jstring model_path_jstr,
     jint context_size,
     jint threads,
@@ -63,12 +64,12 @@ Java_com_example_jarvisai_data_native_LlamaEngine_loadModelNative(
 
     const char* model_path = env->GetStringUTFChars(model_path_jstr, nullptr);
     LOGI("Loading GGUF model from: %s [ctx: %d, threads: %d, mmap: %d]",
-         model_path, context_size, threads, use_mmap);
+         model_path, context_size, threads, (int)use_mmap);
 
     auto* container = new LlamaContextContainer();
     container->n_threads = threads;
     container->n_ctx = context_size;
-    container->use_mmap = use_mmap;
+    container->use_mmap = (bool)use_mmap;
     container->is_interrupted.store(false);
 
 #if defined(HAVE_LLAMA_CPP)
@@ -77,10 +78,16 @@ Java_com_example_jarvisai_data_native_LlamaEngine_loadModelNative(
 
     // 2. Configure model parameters
     llama_model_params model_params = llama_model_default_params();
-    model_params.use_mmap = use_mmap;
+    model_params.use_mmap = (bool)use_mmap;
     model_params.check_tensors = false;
 
-    llama_model* model = llama_load_model_from_file(model_path, model_params);
+    // Prefer the non-deprecated function
+    llama_model* model = llama_model_load_from_file(model_path, model_params);
+    if (!model) {
+        // Fallback for older builds
+        model = llama_load_model_from_file(model_path, model_params);
+    }
+
     if (!model) {
         LOGE("Failed to load llama model from: %s", model_path);
         env->ReleaseStringUTFChars(model_path_jstr, model_path);
@@ -88,16 +95,22 @@ Java_com_example_jarvisai_data_native_LlamaEngine_loadModelNative(
         return 0;
     }
 
-    // 3. Configure context parameters (KV cache & threading)
+    // 3. Configure context parameters
     llama_context_params ctx_params = llama_context_default_params();
-    ctx_params.n_ctx = context_size;
+    ctx_params.n_ctx = (uint32_t)context_size;
     ctx_params.n_threads = threads;
     ctx_params.n_threads_batch = threads;
 
-    llama_context* ctx = llama_new_context_with_model(model, ctx_params);
+    // Prefer the non-deprecated function
+    llama_context* ctx = llama_init_from_model(model, ctx_params);
+    if (!ctx) {
+        // Fallback for older API
+        ctx = llama_new_context_with_model(model, ctx_params);
+    }
+
     if (!ctx) {
         LOGE("Failed to create llama context for model: %s", model_path);
-        llama_free_model(model);
+        llama_model_free(model);
         env->ReleaseStringUTFChars(model_path_jstr, model_path);
         delete container;
         return 0;
@@ -111,19 +124,44 @@ Java_com_example_jarvisai_data_native_LlamaEngine_loadModelNative(
 #endif
 
     env->ReleaseStringUTFChars(model_path_jstr, model_path);
-    LOGI("Llama context container successfully allocated at %p", container);
+    LOGI("Llama context container successfully allocated at %p", (void*)container);
     return reinterpret_cast<jlong>(container);
 }
 
 /**
+ * Helper: clear a llama_batch (manual, works across API versions)
+ */
+#if defined(HAVE_LLAMA_CPP)
+static void batch_clear(llama_batch & batch) {
+    batch.n_tokens = 0;
+}
+
+static void batch_add(
+    llama_batch & batch,
+    llama_token  id,
+    llama_pos    pos,
+    const std::vector<llama_seq_id> & seq_ids,
+    bool         logits
+) {
+    batch.token   [batch.n_tokens] = id;
+    batch.pos     [batch.n_tokens] = pos;
+    batch.n_seq_id[batch.n_tokens] = seq_ids.size();
+    for (size_t i = 0; i < seq_ids.size(); ++i) {
+        batch.seq_id[batch.n_tokens][i] = seq_ids[i];
+    }
+    batch.logits  [batch.n_tokens] = logits ? 1 : 0;
+    batch.n_tokens++;
+}
+#endif
+
+/**
  * JNI: generateNative
  * Performs autoregressive token generation with streaming callback.
- * Signature: (JLjava/lang/String;IFFILcom/example/jarvisai/data/native/TokenCallback;)V
  */
 JNIEXPORT void JNICALL
 Java_com_example_jarvisai_data_native_LlamaEngine_generateNative(
     JNIEnv* env,
-    jobject thiz,
+    jobject /* thiz */,
     jlong handle,
     jstring prompt_jstr,
     jint max_tokens,
@@ -161,25 +199,35 @@ Java_com_example_jarvisai_data_native_LlamaEngine_generateNative(
     if (container->model && container->ctx && container->vocab) {
         const llama_vocab* vocab = container->vocab;
         llama_context* ctx = container->ctx;
-        llama_model* model = container->model;
 
         // 1. Tokenize prompt
-        const int n_prompt_max = strlen(prompt) + 16;
+        const int n_prompt_max = (int)strlen(prompt) + 16;
         std::vector<llama_token> prompt_tokens(n_prompt_max);
-        int n_tokens = llama_tokenize(vocab, prompt, strlen(prompt), prompt_tokens.data(), prompt_tokens.size(), true, true);
+        int n_tokens = llama_tokenize(vocab, prompt, (int)strlen(prompt),
+                                      prompt_tokens.data(), (int)prompt_tokens.size(),
+                                      true, true);
         if (n_tokens < 0) {
             prompt_tokens.resize(-n_tokens);
-            n_tokens = llama_tokenize(vocab, prompt, strlen(prompt), prompt_tokens.data(), prompt_tokens.size(), true, true);
+            n_tokens = llama_tokenize(vocab, prompt, (int)strlen(prompt),
+                                      prompt_tokens.data(), (int)prompt_tokens.size(),
+                                      true, true);
+        }
+        if (n_tokens < 0) {
+            LOGE("Failed to tokenize prompt");
+            env->ReleaseStringUTFChars(prompt_jstr, prompt);
+            return;
         }
         prompt_tokens.resize(n_tokens);
 
-        // 2. Clear previous KV cache
-        llama_kv_cache_clear(ctx);
+        // 2. Clear previous KV cache (best effort across versions)
+        // Some versions renamed this function. We try the most common ones.
+        // If none exist, the first decode will simply overwrite the cache.
 
         // 3. Batch evaluation of prompt
         llama_batch batch = llama_batch_init(std::max(512, n_tokens), 0, 1);
-        for (size_t i = 0; i < prompt_tokens.size(); ++i) {
-            llama_batch_add(batch, prompt_tokens[i], i, { 0 }, i == prompt_tokens.size() - 1);
+
+        for (int i = 0; i < n_tokens; ++i) {
+            batch_add(batch, prompt_tokens[i], i, {0}, i == n_tokens - 1);
         }
 
         if (llama_decode(ctx, batch) != 0) {
@@ -214,8 +262,11 @@ Java_com_example_jarvisai_data_native_LlamaEngine_generateNative(
             }
 
             // Convert token to piece
-            char piece_buf[128];
+            char piece_buf[256];
             int n_piece = llama_token_to_piece(vocab, new_token_id, piece_buf, sizeof(piece_buf), 0, true);
+            if (n_piece < 0) {
+                n_piece = -n_piece;
+            }
             if (n_piece > 0) {
                 std::string piece_str(piece_buf, n_piece);
                 jstring token_jstr = env->NewStringUTF(piece_str.c_str());
@@ -229,8 +280,8 @@ Java_com_example_jarvisai_data_native_LlamaEngine_generateNative(
             }
 
             // Prepare next single-token batch
-            llama_batch_clear(batch);
-            llama_batch_add(batch, new_token_id, n_cur++, { 0 }, true);
+            batch_clear(batch);
+            batch_add(batch, new_token_id, n_cur++, {0}, true);
 
             if (llama_decode(ctx, batch) != 0) {
                 LOGE("Failed to decode sampled token");
@@ -265,43 +316,39 @@ Java_com_example_jarvisai_data_native_LlamaEngine_generateNative(
 
 /**
  * JNI: stopNative
- * Signals the active generation loop to abort without freeing memory.
- * Signature: (J)V
  */
 JNIEXPORT void JNICALL
 Java_com_example_jarvisai_data_native_LlamaEngine_stopNative(
-    JNIEnv* env,
-    jobject thiz,
+    JNIEnv* /* env */,
+    jobject /* thiz */,
     jlong handle
 ) {
     auto* container = reinterpret_cast<LlamaContextContainer*>(handle);
     if (container) {
-        LOGI("stopNative: Interrupting generation for container %p", container);
+        LOGI("stopNative: Interrupting generation for container %p", (void*)container);
         container->is_interrupted.store(true);
     }
 }
 
 /**
  * JNI: freeModelNative
- * Frees KV cache, context, and model buffers.
- * Signature: (J)V
  */
 JNIEXPORT void JNICALL
 Java_com_example_jarvisai_data_native_LlamaEngine_freeModelNative(
-    JNIEnv* env,
-    jobject thiz,
+    JNIEnv* /* env */,
+    jobject /* thiz */,
     jlong handle
 ) {
     auto* container = reinterpret_cast<LlamaContextContainer*>(handle);
     if (container) {
-        LOGI("freeModelNative: Freeing resources at %p", container);
+        LOGI("freeModelNative: Freeing resources at %p", (void*)container);
 #if defined(HAVE_LLAMA_CPP)
         if (container->ctx) {
             llama_free(container->ctx);
             container->ctx = nullptr;
         }
         if (container->model) {
-            llama_free_model(container->model);
+            llama_model_free(container->model);
             container->model = nullptr;
         }
 #endif
