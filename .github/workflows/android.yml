@@ -57,13 +57,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # 4. Setup Gradle Build Tool directly
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.12'
-
-      # 5. Verify and configure pre-installed Android SDK, NDK and CMake
+      # 4. Verify and configure pre-installed Android SDK, NDK and CMake
       - name: Configure Android SDK, NDK and CMake
         run: |
           echo "Configuring Android environment on ubuntu-latest runner..."
@@ -84,18 +78,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
           echo "NDK and CMake configured successfully."
 
-      # 6. Generate Gradle Wrapper if not present
-      - name: Ensure Gradle wrapper exists
-        run: |
-          if [ ! -f "gradlew" ]; then
-            echo "gradlew not found. Generating gradle wrapper..."
-            gradle wrapper --gradle-version 8.12
-            chmod +x gradlew
-          else
-            chmod +x gradlew
-          fi
-
-      # 7. Create fallback debug keystore if not present
+      # 5. Create fallback debug keystore if not present
       - name: Ensure debug keystore exists
         run: |
           if [ ! -f "debug.keystore" ]; then
@@ -103,16 +86,27 @@ jobs:
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      # 8. Compile Debug APK
+      # 6. Execute Build via Gradle
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: |
+          if [ -f "gradlew" ]; then
+            chmod +x gradlew
+            ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          else
+            echo "Executing gradle from wrapper jar..."
+            java -jar gradle/wrapper/gradle-wrapper.jar :app:assembleDebug --stacktrace --no-daemon
+          fi
 
-      # 9. Compile Release APK (Optional)
+      # 7. Compile Release APK (Optional)
       - name: Build Release APK
         run: |
-          ./gradlew :app:assembleRelease --stacktrace || echo "Release build completed or skipped."
+          if [ -f "gradlew" ]; then
+            ./gradlew :app:assembleRelease --stacktrace --no-daemon || echo "Release build completed or skipped."
+          else
+            java -jar gradle/wrapper/gradle-wrapper.jar :app:assembleRelease --stacktrace --no-daemon || echo "Release build completed or skipped."
+          fi
 
-      # 10. Upload Debug APK Artifact
+      # 8. Upload Debug APK Artifact
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -121,7 +115,7 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      # 11. Upload Release APK Artifact (if generated)
+      # 9. Upload Release APK Artifact (if generated)
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:

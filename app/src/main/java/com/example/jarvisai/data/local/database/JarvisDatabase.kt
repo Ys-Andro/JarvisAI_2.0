@@ -44,7 +44,7 @@ abstract class JarvisDatabase : RoomDatabase() {
                 JarvisDatabase::class.java,
                 DATABASE_NAME
             )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }
     }
