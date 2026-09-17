@@ -7,9 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Optimization and ARM64-v8a flags
 if(${ANDROID_ABI} STREQUAL "arm64-v8a")
-    add_compile_options(-O3 -fPIC -pthread -ffast-math)
-    # Enable ARM NEON, Dot Product (dotprod) and FP16 vector instructions
-    add_compile_options(-march=armv8.2-a+dotprod+fp16)
+    add_compile_options(-O3 -fPIC -pthread)
 endif()
 
 # Configuration flags for llama.cpp / ggml
