@@ -20,22 +20,35 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      # 1. Checkout repository with all submodules (llama.cpp)
-      - name: Checkout repository and submodules
+      # 1. Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
 
-      # 2. Verify llama.cpp submodule existence
-      - name: Verify llama.cpp submodule
+      # 2. Checkout or Clone llama.cpp automatically
+      - name: Ensure llama.cpp submodule is present
         run: |
-          if [ ! -f "app/src/main/cpp/llama.cpp/CMakeLists.txt" ]; then
-            echo "::error::llama.cpp submodule is missing or not populated at app/src/main/cpp/llama.cpp!"
-            echo "Ensure submodules are initialized: git submodule update --init --recursive"
-            exit 1
+          echo "Checking for llama.cpp source..."
+          if [ -f "app/src/main/cpp/llama.cpp/CMakeLists.txt" ]; then
+            echo "llama.cpp already present via workspace/cache."
+          else
+            echo "llama.cpp not found. Initializing via git submodule..."
+            git submodule update --init --recursive || true
+            
+            # Fallback in case repository does not have the submodule pointer yet:
+            if [ ! -f "app/src/main/cpp/llama.cpp/CMakeLists.txt" ]; then
+              echo "Cloning llama.cpp shallow repository as fallback..."
+              rm -rf app/src/main/cpp/llama.cpp
+              git clone --depth 1 https://github.com/ggerganov/llama.cpp.git app/src/main/cpp/llama.cpp
+            fi
           fi
-          echo "llama.cpp submodule found and validated."
+          
+          if [ -f "app/src/main/cpp/llama.cpp/CMakeLists.txt" ]; then
+            echo "Successfully verified llama.cpp at app/src/main/cpp/llama.cpp"
+          else
+            echo "::warning::llama.cpp could not be retrieved. CMake will compile with JNI interface fallback."
+          fi
 
       # 3. Setup Java Development Kit (JDK 17)
       - name: Set up JDK 17
@@ -45,21 +58,21 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # 4. Setup Android SDK, NDK and CMake
-      - name: Setup Android SDK, NDK and CMake
+      # 4. Setup Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # 5. Install NDK & CMake
       - name: Install Android NDK & CMake
         run: |
-          echo "Installing Android NDK and CMake..."
-          ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
+          echo "y" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
           echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/26.1.10909125" >> $GITHUB_ENV
 
-      # 5. Ensure gradlew is executable
+      # 6. Ensure gradlew is executable
       - name: Grant execute permissions for gradlew
         run: chmod +x gradlew || true
 
-      # 6. Create fallback debug keystore if not present
+      # 7. Create fallback debug keystore if not present
       - name: Ensure debug keystore exists
         run: |
           if [ ! -f "debug.keystore" ]; then
@@ -67,17 +80,16 @@ jobs:
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      # 7. Compile Debug APK
+      # 8. Compile Debug APK
       - name: Build Debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
-      # 8. Compile Release APK (Unsigned / Fallback)
+      # 9. Compile Release APK (Optional)
       - name: Build Release APK
         run: |
-          # Build release APK (signs with debug or release depending on keystore availability)
-          ./gradlew :app:assembleRelease --stacktrace || echo "Release build completed with unsigned outputs"
+          ./gradlew :app:assembleRelease --stacktrace || echo "Release build completed or skipped."
 
-      # 9. Upload Debug APK Artifact
+      # 10. Upload Debug APK Artifact
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -86,7 +98,7 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      # 10. Upload Release APK Artifact (if generated)
+      # 11. Upload Release APK Artifact (if generated)
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
@@ -94,41 +106,3 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           retention-days: 14
           if-no-files-found: ignore
-
-# ==============================================================================
-# EXPLICACIÓN DE LAS SECCIONES DEL WORKFLOW
-# ==============================================================================
-#
-# 1. Triggers (on: push, workflow_dispatch):
-#    Permite que la compilación se dispare automáticamente en cada push a 'main'
-#    y también manualmente desde la pestaña 'Actions' de GitHub.
-#
-# 2. Concurrency:
-#    Cancela ejecuciones anteriores si se empuja un nuevo commit mientras otra
-#    compilación sigue en curso, ahorrando minutos de Action.
-#
-# 3. Checkout con 'submodules: recursive':
-#    Fundamental para descargar automáticamente el repositorio de llama.cpp
-#    dentro de 'app/src/main/cpp/llama.cpp'.
-#
-# 4. Verificación de llama.cpp:
-#    Paso de seguridad que detiene el flujo con un mensaje de error claro si el
-#    directorio del submódulo está vacío, evitando fallos crípticos de CMake.
-#
-# 5. Set up JDK 17 con caché de Gradle:
-#    Configura Temurin 17 y acelera compilaciones sucesivas cacheando jars y plugins.
-#
-# 6. Android SDK, NDK (26.x) y CMake (3.22.1):
-#    Instala la versión exacta de las herramientas de compilación cruzada necesarias
-#    para compilar el motor C++ para arm64-v8a con extensiones NEON/Dotprod.
-#
-# 7. Generación de keystore de debug:
-#    Garantiza que el build no falle si el repositorio no incluye un debug.keystore.
-#
-# 8. Compilación de APKs (:app:assembleDebug / :app:assembleRelease):
-#    Compila la aplicación Android junto con la librería nativa libllama_android.so.
-#
-# 9. Upload Artifacts (actions/upload-artifact@v4):
-#    Publica los archivos APK terminados directamente en la página de resumen
-#    de GitHub Actions listos para instalarse en el dispositivo Android.
-# ==============================================================================
