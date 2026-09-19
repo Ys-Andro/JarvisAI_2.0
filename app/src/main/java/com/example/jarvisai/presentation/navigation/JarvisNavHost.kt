@@ -39,7 +39,7 @@ fun JarvisNavHost(
             ChatScreen(
                 viewModel = chatViewModel,
                 onNavigateToModels = {
-                    navController.navigate(Screen.Models.route)
+                    navController.navigate(Screen.Settings.route)
                 },
                 onNavigateToHistory = {
                     navController.navigate(Screen.Library.route)

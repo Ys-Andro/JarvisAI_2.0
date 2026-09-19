@@ -25,6 +25,14 @@ class AppPreferences(private val context: Context) {
 
     private object Keys {
         val SELECTED_MODEL_ID = stringPreferencesKey("selected_model_id")
+        val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+        val OPENROUTER_API_KEY = stringPreferencesKey("openrouter_api_key")
+        val OPENAI_API_KEY = stringPreferencesKey("openai_api_key")
+        val DEEPSEEK_API_KEY = stringPreferencesKey("deepseek_api_key")
+        val GROQ_API_KEY = stringPreferencesKey("groq_api_key")
+        val ANTHROPIC_API_KEY = stringPreferencesKey("anthropic_api_key")
+        val CUSTOM_OPENAI_ENDPOINT = stringPreferencesKey("custom_openai_endpoint")
+        val SELECTED_GEMINI_MODEL = stringPreferencesKey("selected_gemini_model")
         val TEMPERATURE = floatPreferencesKey("temperature")
         val TOP_P = floatPreferencesKey("top_p")
         val TOP_K = intPreferencesKey("top_k")
@@ -49,6 +57,41 @@ class AppPreferences(private val context: Context) {
 
     val selectedModelId: Flow<String?> = safePreferences.map { preferences ->
         preferences[Keys.SELECTED_MODEL_ID]
+    }
+
+    val apiKey: Flow<String?> = safePreferences.map { preferences ->
+        preferences[Keys.GEMINI_API_KEY]
+    }
+
+    fun getProviderApiKey(providerId: String): Flow<String?> = safePreferences.map { preferences ->
+        when (providerId.lowercase()) {
+            "gemini" -> preferences[Keys.GEMINI_API_KEY]
+            "openrouter" -> preferences[Keys.OPENROUTER_API_KEY]
+            "openai" -> preferences[Keys.OPENAI_API_KEY]
+            "deepseek" -> preferences[Keys.DEEPSEEK_API_KEY]
+            "groq" -> preferences[Keys.GROQ_API_KEY]
+            "anthropic" -> preferences[Keys.ANTHROPIC_API_KEY]
+            else -> preferences[Keys.GEMINI_API_KEY]
+        }
+    }
+
+    val customOpenAiEndpoint: Flow<String?> = safePreferences.map { preferences ->
+        preferences[Keys.CUSTOM_OPENAI_ENDPOINT]
+    }
+
+    val allProviderApiKeys: Flow<Map<String, String>> = safePreferences.map { preferences ->
+        buildMap {
+            preferences[Keys.GEMINI_API_KEY]?.let { put("gemini", it) }
+            preferences[Keys.OPENROUTER_API_KEY]?.let { put("openrouter", it) }
+            preferences[Keys.OPENAI_API_KEY]?.let { put("openai", it) }
+            preferences[Keys.DEEPSEEK_API_KEY]?.let { put("deepseek", it) }
+            preferences[Keys.GROQ_API_KEY]?.let { put("groq", it) }
+            preferences[Keys.ANTHROPIC_API_KEY]?.let { put("anthropic", it) }
+        }
+    }
+
+    val selectedGeminiModel: Flow<String> = safePreferences.map { preferences ->
+        preferences[Keys.SELECTED_GEMINI_MODEL] ?: "gemini-2.5-flash"
     }
 
     val generationSettings: Flow<GenerationSettings> = safePreferences.map { preferences ->
@@ -134,6 +177,51 @@ class AppPreferences(private val context: Context) {
     suspend fun updateSystemPrompt(prompt: String) {
         dataStore.edit { preferences ->
             preferences[Keys.SYSTEM_PROMPT] = prompt
+        }
+    }
+
+    suspend fun updateApiKey(apiKey: String) {
+        dataStore.edit { preferences ->
+            if (apiKey.isBlank()) {
+                preferences.remove(Keys.GEMINI_API_KEY)
+            } else {
+                preferences[Keys.GEMINI_API_KEY] = apiKey.trim()
+            }
+        }
+    }
+
+    suspend fun updateProviderApiKey(providerId: String, apiKey: String) {
+        dataStore.edit { preferences ->
+            val key = when (providerId.lowercase()) {
+                "gemini" -> Keys.GEMINI_API_KEY
+                "openrouter" -> Keys.OPENROUTER_API_KEY
+                "openai" -> Keys.OPENAI_API_KEY
+                "deepseek" -> Keys.DEEPSEEK_API_KEY
+                "groq" -> Keys.GROQ_API_KEY
+                "anthropic" -> Keys.ANTHROPIC_API_KEY
+                else -> Keys.GEMINI_API_KEY
+            }
+            if (apiKey.isBlank()) {
+                preferences.remove(key)
+            } else {
+                preferences[key] = apiKey.trim()
+            }
+        }
+    }
+
+    suspend fun updateCustomOpenAiEndpoint(endpoint: String) {
+        dataStore.edit { preferences ->
+            if (endpoint.isBlank()) {
+                preferences.remove(Keys.CUSTOM_OPENAI_ENDPOINT)
+            } else {
+                preferences[Keys.CUSTOM_OPENAI_ENDPOINT] = endpoint.trim()
+            }
+        }
+    }
+
+    suspend fun updateSelectedGeminiModel(model: String) {
+        dataStore.edit { preferences ->
+            preferences[Keys.SELECTED_GEMINI_MODEL] = model
         }
     }
 

@@ -2,7 +2,9 @@ package com.example.jarvisai.presentation.chat
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.speech.RecognizerIntent
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -32,10 +34,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -46,7 +52,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.presentation.chat.components.ChatInputBar
 import com.example.jarvisai.presentation.chat.components.MessageBubble
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
@@ -68,6 +77,7 @@ import com.example.jarvisai.ui.theme.JarvisPrimary
 import com.example.jarvisai.ui.theme.JarvisSurface
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
+import java.io.InputStream
 import java.util.Locale
 
 @Composable
@@ -96,6 +106,26 @@ fun ChatScreen(
         }
     }
 
+    // Photo Picker launcher for multimodal input
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+                val bytes = inputStream?.readBytes()
+                inputStream?.close()
+                if (bytes != null) {
+                    val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+                    viewModel.attachImage(uri.toString(), base64, mimeType)
+                }
+            } catch (e: Exception) {
+                // Ignore read error
+            }
+        }
+    }
+
     // Auto-scroll to bottom on new message or streaming update
     LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.content?.length) {
         if (uiState.messages.isNotEmpty()) {
@@ -119,9 +149,20 @@ fun ChatScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ChatTopBar(
-                modelName = uiState.activeModel?.name,
+                selectedModelId = uiState.selectedModelId,
+                onModelSelected = { viewModel.selectModel(it) },
                 isModelLoaded = uiState.isModelLoaded,
+                isProviderReady = { uiState.isProviderReady(it) },
                 tokensPerSecond = uiState.tokensPerSecond,
+                onShareClick = {
+                    val exportText = viewModel.getConversationExportText()
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Conversación con Jarvis AI")
+                        putExtra(Intent.EXTRA_TEXT, exportText)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "Compartir conversación"))
+                },
                 onModelsClick = onNavigateToModels,
                 onHistoryClick = onNavigateToHistory
             )
@@ -131,11 +172,14 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .imePadding()
             ) {
-                // Warning if no model is loaded
+                // Warning if current selected provider has no API key
                 if (!uiState.isModelLoaded) {
-                    NoModelLoadedBanner(onLoadClick = onNavigateToModels)
+                    val currentModel = CloudAiModel.findById(uiState.selectedModelId)
+                    NoModelLoadedBanner(
+                        providerName = currentModel.provider.displayName,
+                        onLoadClick = onNavigateToModels
+                    )
                 }
 
                 ChatInputBar(
@@ -154,6 +198,15 @@ fun ChatScreen(
                             // STT not supported on this device
                         }
                     },
+                    onPickImageClick = {
+                        photoPickerLauncher.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    },
+                    attachedImageUri = uiState.attachedImageUri,
+                    onRemoveImageClick = { viewModel.clearAttachedImage() },
                     isGenerating = uiState.inferenceStatus is ChatInferenceStatus.Generating,
                     onStopClick = viewModel::stopGeneration,
                     isEnabled = uiState.isModelLoaded
@@ -167,9 +220,10 @@ fun ChatScreen(
                 .padding(innerPadding)
         ) {
             if (uiState.messages.isEmpty()) {
+                val currentModel = CloudAiModel.ALL_MODELS.firstOrNull { it.id == uiState.selectedModelId }
                 EmptyChatPlaceholder(
                     isModelLoaded = uiState.isModelLoaded,
-                    modelName = uiState.activeModel?.name,
+                    modelName = currentModel?.name ?: uiState.activeModel?.name,
                     onConfigureModelClick = onNavigateToModels
                 )
             } else {
@@ -197,64 +251,136 @@ fun ChatScreen(
 
 @Composable
 private fun ChatTopBar(
-    modelName: String?,
+    selectedModelId: String,
+    onModelSelected: (String) -> Unit,
     isModelLoaded: Boolean,
+    isProviderReady: (com.example.jarvisai.domain.model.ModelProvider) -> Boolean = { true },
     tokensPerSecond: Float,
+    onShareClick: () -> Unit,
     onModelsClick: () -> Unit,
     onHistoryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isDropdownExpanded by remember { mutableStateOf(false) }
+    val currentModel = CloudAiModel.ALL_MODELS.firstOrNull { it.id == selectedModelId } ?: CloudAiModel.ALL_MODELS.first()
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .background(JarvisSurface)
             .border(width = 1.dp, color = JarvisBorder)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Title & Model Status Indicator
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { onModelsClick() }
-                .padding(vertical = 4.dp, horizontal = 6.dp)
-        ) {
-            Box(
+        // Model Selector Dropdown trigger
+        Box {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentRed)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(
-                    text = "JARVIS AI",
-                    color = JarvisTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF0F1E33))
+                    .border(1.dp, JarvisBorder, RoundedCornerShape(8.dp))
+                    .clickable { isDropdownExpanded = true }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentRed)
                 )
-                Text(
-                    text = if (isModelLoaded) {
-                        modelName ?: "Modelo cargado (Offline)"
-                    } else {
-                        "Sin modelo activo • Tap para cargar"
-                    },
-                    color = if (isModelLoaded) JarvisPrimary else JarvisTextSecondary,
-                    fontSize = 11.sp,
-                    maxLines = 1
-                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = currentModel.name,
+                            color = JarvisPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Cambiar modelo",
+                            tint = JarvisPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Text(
+                        text = "${currentModel.provider.displayName} • ${if (isModelLoaded) "Listo" else "Falta API Key"}",
+                        color = if (isModelLoaded) JarvisTextSecondary else Color(0xFFFF8A80),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = isDropdownExpanded,
+                onDismissRequest = { isDropdownExpanded = false },
+                modifier = Modifier
+                    .background(JarvisSurface)
+                    .border(1.dp, JarvisBorder, RoundedCornerShape(8.dp))
+            ) {
+                CloudAiModel.ALL_MODELS.forEach { model ->
+                    val isSelected = model.id == selectedModelId
+                    val isReady = isProviderReady(model.provider)
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = model.name,
+                                        color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 13.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (isReady) Color(0x2000E5FF) else Color(0x25FF5252))
+                                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isReady) "Listo" else "Sin Key",
+                                            color = if (isReady) JarvisAccentGreen else Color(0xFFFF8A80),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = model.description,
+                                    color = JarvisTextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        },
+                        onClick = {
+                            onModelSelected(model.id)
+                            isDropdownExpanded = false
+                        }
+                    )
+                }
             }
         }
 
-        // Action Icons (Sessions History & Models / Settings)
+        // Action Icons (Speed, Share, History, Settings)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             if (tokensPerSecond > 0f) {
                 Text(
@@ -267,8 +393,19 @@ private fun ChatTopBar(
             }
 
             IconButton(
+                onClick = onShareClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Compartir o exportar conversación",
+                    tint = JarvisTextSecondary
+                )
+            }
+
+            IconButton(
                 onClick = onHistoryClick,
-                modifier = Modifier.size(38.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.FolderOpen,
@@ -279,11 +416,11 @@ private fun ChatTopBar(
 
             IconButton(
                 onClick = onModelsClick,
-                modifier = Modifier.size(38.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Memory,
-                    contentDescription = "Gestor de modelos GGUF",
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Configuración y API Keys",
                     tint = JarvisPrimary
                 )
             }
@@ -293,6 +430,7 @@ private fun ChatTopBar(
 
 @Composable
 private fun NoModelLoadedBanner(
+    providerName: String,
     onLoadClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -301,21 +439,30 @@ private fun NoModelLoadedBanner(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1C1315))
-            .border(1.dp, Color(0xFF5A1E24), RoundedCornerShape(8.dp))
+            .background(Color(0xFF1E1416))
+            .border(1.dp, Color(0xFF6A2027), RoundedCornerShape(8.dp))
             .clickable { onLoadClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "⚠️ Falta la API Key de $providerName",
+                color = Color(0xFFFF8A80),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "Toca aquí para ingresarla en Ajustes o selecciona Google Gemini",
+                color = JarvisTextSecondary,
+                fontSize = 10.sp
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "⚠️ No hay modelo GGUF cargado en RAM",
-            color = Color(0xFFFF8A80),
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace
-        )
-        Text(
-            text = "CARGAR",
+            text = "AJUSTES",
             color = JarvisPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -348,7 +495,7 @@ private fun EmptyChatPlaceholder(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.Memory,
+                imageVector = Icons.Default.Settings,
                 contentDescription = null,
                 tint = JarvisPrimary,
                 modifier = Modifier.size(36.dp)
@@ -358,7 +505,7 @@ private fun EmptyChatPlaceholder(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "JARVIS OFFLINE ENGINE",
+            text = "JARVIS MULTI-MODEL AI",
             color = JarvisTextPrimary,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
@@ -370,9 +517,9 @@ private fun EmptyChatPlaceholder(
 
         Text(
             text = if (isModelLoaded) {
-                "Modelo activo: ${modelName ?: "GGUF"}\nInferencia privada y 100% offline lista."
+                "Motor activo: ${modelName ?: "Multi-Model AI"}\nSoporte para Gemini, OpenAI, DeepSeek, Groq y Anthropic."
             } else {
-                "Importa y carga cualquier modelo GGUF (Llama 3, Qwen, Mistral, Gemma) para comenzar a chatear sin internet."
+                "Conéctate con tu proveedor preferido (Gemini, OpenAI, DeepSeek, Groq o Claude) para comenzar."
             },
             color = JarvisTextSecondary,
             fontSize = 13.sp,
@@ -380,23 +527,21 @@ private fun EmptyChatPlaceholder(
             lineHeight = 18.sp
         )
 
-        if (!isModelLoaded) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(JarvisPrimary)
-                    .clickable { onConfigureModelClick() }
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    text = "ABRIR GESTOR DE MODELOS",
-                    color = Color(0xFF001F28),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
+        Spacer(modifier = Modifier.height(20.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(JarvisPrimary)
+                .clickable { onConfigureModelClick() }
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = "CONFIGURAR API KEY Y MODELO",
+                color = Color(0xFF001F28),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }

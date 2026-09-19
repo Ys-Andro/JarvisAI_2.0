@@ -3,6 +3,8 @@ package com.example.jarvisai.presentation.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,9 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +43,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jarvisai.domain.model.AppThemeMode
 import com.example.jarvisai.presentation.models.ModelsViewModel
+import com.example.jarvisai.ui.theme.JarvisAccentGreen
 import com.example.jarvisai.ui.theme.JarvisBackground
 import com.example.jarvisai.ui.theme.JarvisBorder
 import com.example.jarvisai.ui.theme.JarvisBorderGlow
@@ -66,6 +76,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val settings = uiState.settings
+    var apiKeyInput by remember(uiState.apiKey) { mutableStateOf(uiState.apiKey ?: "") }
 
     Scaffold(
         modifier = modifier
@@ -83,10 +94,296 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Section 0: Multi-provider API Keys & Model Configuration
+            item {
+                SettingsSectionCard(
+                    title = "CLAVES API POR PROVEEDOR",
+                    icon = Icons.Default.Key
+                ) {
+                    Text(
+                        text = "Configura de manera independiente las API Keys para cada proveedor (Gemini, OpenAI, DeepSeek, Groq, Anthropic). Cada proveedor almacena su clave de forma segura y aislada.",
+                        color = JarvisTextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val providers = listOf(
+                        Triple("gemini", "Google Gemini", "AIzaSy... (o usa .env)"),
+                        Triple("openrouter", "OpenRouter", "sk-or-v1-..."),
+                        Triple("openai", "OpenAI", "sk-proj-..."),
+                        Triple("deepseek", "DeepSeek", "sk-..."),
+                        Triple("groq", "Groq Cloud", "gsk_..."),
+                        Triple("anthropic", "Anthropic Claude", "sk-ant-api...")
+                    )
+
+                    var selectedProviderTab by remember { mutableStateOf("gemini") }
+
+                    // Provider Tabs
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        providers.forEach { (pId, pName, _) ->
+                            val isCurrentTab = selectedProviderTab == pId
+                            val hasKey = !uiState.providerApiKeys[pId].isNullOrBlank() || (pId == "gemini" && !uiState.apiKey.isNullOrBlank())
+                            val tabLabel = when (pId) {
+                                "openrouter" -> "OpenRouter"
+                                "anthropic" -> "Claude"
+                                "gemini" -> "Gemini"
+                                "openai" -> "OpenAI"
+                                "deepseek" -> "DeepSeek"
+                                "groq" -> "Groq"
+                                else -> pName.split(" ").last()
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isCurrentTab) JarvisPrimary else JarvisSurfaceVariant)
+                                    .clickable { selectedProviderTab = pId }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = tabLabel,
+                                        color = if (isCurrentTab) Color(0xFF001F28) else JarvisTextPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    if (hasKey) {
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(top = 3.dp)
+                                                .size(5.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(if (isCurrentTab) Color(0xFF001F28) else JarvisAccentGreen)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Input for selected provider
+                    val currentProvider = providers.first { it.first == selectedProviderTab }
+                    val currentSavedKey = uiState.providerApiKeys[currentProvider.first] ?: if (currentProvider.first == "gemini") uiState.apiKey else null
+                    var currentKeyInput by remember(selectedProviderTab, currentSavedKey) {
+                        mutableStateOf(currentSavedKey ?: "")
+                    }
+
+                    Text(
+                        text = "CLAVE PARA ${currentProvider.second.uppercase()}",
+                        color = JarvisPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    OutlinedTextField(
+                        value = currentKeyInput,
+                        onValueChange = { currentKeyInput = it },
+                        placeholder = {
+                            Text(
+                                text = currentProvider.third,
+                                color = JarvisTextSecondary.copy(alpha = 0.5f),
+                                fontSize = 12.sp
+                            )
+                        },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = JarvisPrimary,
+                            unfocusedBorderColor = JarvisBorder,
+                            focusedTextColor = JarvisTextPrimary,
+                            unfocusedTextColor = JarvisTextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.updateProviderApiKey(currentProvider.first, currentKeyInput.trim())
+                                if (currentProvider.first == "gemini") {
+                                    viewModel.updateApiKey(currentKeyInput.trim())
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JarvisPrimary,
+                                contentColor = Color(0xFF001F28)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "GUARDAR EN ${currentProvider.second.uppercase()}",
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        if (!currentSavedKey.isNullOrBlank()) {
+                            Button(
+                                onClick = {
+                                    currentKeyInput = ""
+                                    viewModel.updateProviderApiKey(currentProvider.first, "")
+                                    if (currentProvider.first == "gemini") {
+                                        viewModel.updateApiKey("")
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = JarvisSurfaceVariant,
+                                    contentColor = Color(0xFFFF8A80)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "BORRAR",
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Optional Custom Endpoint for OpenAI or Compatible APIs (LocalAI, Ollama, LMStudio, etc.)
+                    if (currentProvider.first == "openai") {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        var customEndpointInput by remember(uiState.customOpenAiEndpoint) {
+                            mutableStateOf(uiState.customOpenAiEndpoint ?: "")
+                        }
+                        Text(
+                            text = "ENDPOINT PERSONALIZADO (OPCIONAL)",
+                            color = JarvisTextSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = customEndpointInput,
+                            onValueChange = { customEndpointInput = it },
+                            placeholder = {
+                                Text(
+                                    text = "https://api.openai.com/v1 (o servidor local)",
+                                    color = JarvisTextSecondary.copy(alpha = 0.5f),
+                                    fontSize = 11.sp
+                                )
+                            },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = JarvisPrimary,
+                                unfocusedBorderColor = JarvisBorder,
+                                focusedTextColor = JarvisTextPrimary,
+                                unfocusedTextColor = JarvisTextPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Button(
+                            onClick = { viewModel.updateCustomOpenAiEndpoint(customEndpointInput.trim()) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JarvisSurfaceVariant,
+                                contentColor = JarvisPrimary
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "GUARDAR ENDPOINT",
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "MODELO DE INTELIGENCIA ARTIFICIAL",
+                        color = JarvisTextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    com.example.jarvisai.domain.model.CloudAiModel.ALL_MODELS.forEach { model ->
+                        val isSelected = uiState.selectedGeminiModel == model.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) JarvisPrimary.copy(alpha = 0.15f) else JarvisSurfaceVariant)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) JarvisPrimary else JarvisBorder,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable { viewModel.updateSelectedGeminiModel(model.id) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = model.name,
+                                        color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "[${model.provider.displayName}]",
+                                        color = JarvisPrimary.copy(alpha = 0.8f),
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Text(
+                                    text = model.description,
+                                    color = JarvisTextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            if (isSelected) {
+                                Text(
+                                    text = "ACTIVO",
+                                    color = JarvisAccentGreen,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Section 1: Inferencia & Parámetros LLM
             item {
                 SettingsSectionCard(
-                    title = "MOTOR DE INFERENCIA",
+                    title = "PARÁMETROS DE GENERACIÓN",
                     icon = Icons.Default.Tune
                 ) {
                     // Temperature
@@ -117,26 +414,6 @@ fun SettingsScreen(
                         onValueChange = { viewModel.updateTopK(it.roundToInt()) },
                         valueRange = 1f..100f,
                         steps = 98
-                    )
-
-                    // Context Size (KV Cache)
-                    SliderSettingRow(
-                        label = "Ventana de Contexto (Tokens)",
-                        valueText = "${settings.contextWindow}",
-                        value = settings.contextWindow.toFloat(),
-                        onValueChange = { viewModel.updateContextWindow(it.roundToInt()) },
-                        valueRange = 512f..8192f,
-                        steps = 14
-                    )
-
-                    // CPU Threads
-                    SliderSettingRow(
-                        label = "Hilos de CPU (${uiState.availableCpuCores} núcleos detectados)",
-                        valueText = "${settings.cpuThreads} hilos",
-                        value = settings.cpuThreads.toFloat(),
-                        onValueChange = { viewModel.updateCpuThreads(it.roundToInt()) },
-                        valueRange = 1f..uiState.availableCpuCores.coerceAtLeast(4).toFloat(),
-                        steps = (uiState.availableCpuCores.coerceAtLeast(4) - 2).coerceAtLeast(0)
                     )
                 }
             }

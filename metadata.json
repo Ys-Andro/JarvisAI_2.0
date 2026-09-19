@@ -1,6 +1,6 @@
 {
   "name": "JarvisAi",
-  "description": "Aplicación Android offline para chatear con modelos de lenguaje GGUF usando llama.cpp con TTS y biblioteca local.",
+  "description": "Asistente inteligente Jarvis multi-modelo (Gemini, OpenRouter, OpenAI GPT-4o, DeepSeek V3/R1, Groq Llama 3.3, Claude), chat en streaming, TTS por voz y gestión de sesiones.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

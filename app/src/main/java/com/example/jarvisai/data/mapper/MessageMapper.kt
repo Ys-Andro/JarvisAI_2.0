@@ -19,7 +19,8 @@ fun MessageEntity.toDomain(isStreaming: Boolean = false): Message {
         tokensCount = tokensCount,
         generationDurationMs = generationDurationMs,
         tokensPerSecond = tokensPerSecond,
-        isStreaming = isStreaming
+        isStreaming = isStreaming,
+        imageUri = imageUri
     )
 }
 
@@ -32,6 +33,7 @@ fun Message.toEntity(): MessageEntity {
         timestamp = timestamp,
         tokensCount = tokensCount,
         generationDurationMs = generationDurationMs,
-        tokensPerSecond = tokensPerSecond
+        tokensPerSecond = tokensPerSecond,
+        imageUri = imageUri
     )
 }

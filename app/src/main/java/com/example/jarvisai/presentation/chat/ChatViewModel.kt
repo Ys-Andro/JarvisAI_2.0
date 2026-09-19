@@ -2,10 +2,13 @@ package com.example.jarvisai.presentation.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
+import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.domain.model.GenerationSettings
 import com.example.jarvisai.domain.model.InferenceState
 import com.example.jarvisai.domain.model.LocalGgufModel
 import com.example.jarvisai.domain.model.Message
+import com.example.jarvisai.domain.model.ModelProvider
 import com.example.jarvisai.domain.model.Role
 import com.example.jarvisai.domain.repository.IConversationRepository
 import com.example.jarvisai.domain.repository.IInferenceRepository
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -39,7 +43,105 @@ class ChatViewModel(
         observeInferenceState()
         observeActiveModel()
         observeTtsState()
+        observeModelAndApiKeys()
         initDefaultConversation()
+    }
+
+    private fun observeModelAndApiKeys() {
+        viewModelScope.launch {
+            combine(
+                settingsRepository.getSelectedGeminiModel(),
+                settingsRepository.getAllProviderApiKeys(),
+                settingsRepository.getApiKey()
+            ) { selectedModelId, providerKeys, generalApiKey ->
+                val modelDef = CloudAiModel.findById(selectedModelId)
+                val isReady = isProviderConfigured(modelDef.provider, providerKeys, generalApiKey)
+                Triple(selectedModelId, providerKeys, isReady)
+            }.collect { (modelId, providerKeys, isReady) ->
+                _uiState.update {
+                    it.copy(
+                        selectedModelId = modelId,
+                        providerApiKeys = providerKeys,
+                        isModelLoaded = isReady
+                    )
+                }
+            }
+        }
+    }
+
+    private fun isProviderConfigured(
+        provider: ModelProvider,
+        providerKeys: Map<String, String>,
+        generalApiKey: String?
+    ): Boolean {
+        if (provider == ModelProvider.GEMINI) {
+            val provKey = providerKeys["gemini"]
+            val buildKey = try {
+                BuildConfig.GEMINI_API_KEY
+            } catch (_: Throwable) {
+                ""
+            }
+            return !provKey.isNullOrBlank() ||
+                    (!generalApiKey.isNullOrBlank() && generalApiKey != "DEFAULT_API_KEY") ||
+                    (buildKey.isNotBlank() && buildKey != "DEFAULT_API_KEY")
+        }
+        val key = providerKeys[provider.id.lowercase()]
+        return !key.isNullOrBlank()
+    }
+
+    fun selectModel(modelId: String) {
+        viewModelScope.launch {
+            settingsRepository.updateSelectedGeminiModel(modelId)
+            val modelDef = CloudAiModel.findById(modelId)
+            val providerKeys = _uiState.value.providerApiKeys
+            val genKey = settingsRepository.getApiKey().first()
+            val isReady = isProviderConfigured(modelDef.provider, providerKeys, genKey)
+            _uiState.update {
+                it.copy(
+                    selectedModelId = modelId,
+                    isModelLoaded = isReady,
+                    errorMessage = if (!isReady) "Falta la API Key de ${modelDef.provider.displayName}. Configúrala en Ajustes o selecciona Google Gemini." else null
+                )
+            }
+        }
+    }
+
+    fun attachImage(uriString: String?, base64: String?, mimeType: String?) {
+        _uiState.update {
+            it.copy(
+                attachedImageUri = uriString,
+                attachedImageBase64 = base64,
+                attachedImageMimeType = mimeType
+            )
+        }
+    }
+
+    fun clearAttachedImage() {
+        _uiState.update {
+            it.copy(
+                attachedImageUri = null,
+                attachedImageBase64 = null,
+                attachedImageMimeType = null
+            )
+        }
+    }
+
+    fun getConversationExportText(): String {
+        val conv = _uiState.value.conversation
+        val msgs = _uiState.value.messages
+        val sb = StringBuilder()
+        sb.append("=== CONVERSACIÓN: ${conv?.title ?: "Jarvis AI Chat"} ===\n")
+        sb.append("Fecha: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}\n\n")
+
+        for (msg in msgs) {
+            val roleName = if (msg.role == Role.USER) "USUARIO" else "JARVIS"
+            sb.append("[$roleName]\n")
+            if (msg.imageUri != null) {
+                sb.append("(Imagen adjunta)\n")
+            }
+            sb.append("${msg.content}\n\n")
+        }
+        return sb.toString()
     }
 
     private fun observeInferenceState() {
@@ -109,7 +211,12 @@ class ChatViewModel(
     private fun observeTtsState() {
         viewModelScope.launch {
             ttsRepository.isSpeaking.collect { isSpeaking ->
-                _uiState.update { it.copy(isSpeakingTts = isSpeaking) }
+                _uiState.update { 
+                    it.copy(
+                        isSpeakingTts = isSpeaking,
+                        speakingMessageId = if (isSpeaking) it.speakingMessageId else null
+                    ) 
+                }
             }
         }
     }
@@ -151,29 +258,42 @@ class ChatViewModel(
         val prompt = _uiState.value.inputPrompt.trim()
         if (prompt.isEmpty()) return
 
+        val currentModel = CloudAiModel.findById(_uiState.value.selectedModelId)
+        if (!_uiState.value.isModelLoaded) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Falta la API Key de ${currentModel.provider.displayName}. Ingrésala en Ajustes o selecciona Google Gemini."
+                )
+            }
+            return
+        }
+
         val conversationId = currentConversationId ?: return
 
-        // 1. Clear input field immediately
-        _uiState.update { it.copy(inputPrompt = "") }
+        // 1. Clear input field and attached image immediately
+        val attachedUri = _uiState.value.attachedImageUri
+        val attachedBase64 = _uiState.value.attachedImageBase64
+        val attachedMime = _uiState.value.attachedImageMimeType
+
+        _uiState.update {
+            it.copy(
+                inputPrompt = "",
+                attachedImageUri = null,
+                attachedImageBase64 = null,
+                attachedImageMimeType = null,
+                errorMessage = null
+            )
+        }
 
         viewModelScope.launch {
-            // Check if model is loaded
-            if (!inferenceRepository.isModelLoaded()) {
-                _uiState.update {
-                    it.copy(
-                        errorMessage = "Por favor carga un modelo GGUF antes de enviar mensajes."
-                    )
-                }
-                return@launch
-            }
-
-            // 2. Insert User message into Room
+            // 2. Insert User message into Room (with attached image if any)
             val userMsg = Message(
                 id = UUID.randomUUID().toString(),
                 conversationId = conversationId,
                 role = Role.USER,
                 content = prompt,
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                imageUri = attachedUri
             )
             conversationRepository.insertMessage(userMsg)
 
@@ -206,7 +326,9 @@ class ChatViewModel(
                 assistantMsgId = assistantMsgId,
                 prompt = prompt,
                 history = history,
-                settings = settings
+                settings = settings,
+                imageBase64 = attachedBase64,
+                imageMimeType = attachedMime
             )
         }
     }
@@ -215,7 +337,9 @@ class ChatViewModel(
         assistantMsgId: String,
         prompt: String,
         history: List<Message>,
-        settings: GenerationSettings
+        settings: GenerationSettings,
+        imageBase64: String? = null,
+        imageMimeType: String? = null
     ) {
         generationJob?.cancel()
         generationJob = viewModelScope.launch {
@@ -223,7 +347,13 @@ class ChatViewModel(
             val startTime = System.currentTimeMillis()
             var tokenCount = 0
 
-            inferenceRepository.generateCompletionStream(prompt, history, settings)
+            inferenceRepository.generateCompletionStream(
+                prompt = prompt,
+                conversationHistory = history,
+                settings = settings,
+                imageBase64 = imageBase64,
+                imageMimeType = imageMimeType
+            )
                 .catch { error ->
                     _uiState.update {
                         it.copy(

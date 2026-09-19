@@ -17,7 +17,7 @@ import com.example.jarvisai.data.local.database.entity.MessageEntity
         MessageEntity::class,
         LocalGgufModelEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class JarvisDatabase : RoomDatabase() {

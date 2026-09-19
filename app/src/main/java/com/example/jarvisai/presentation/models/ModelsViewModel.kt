@@ -42,6 +42,38 @@ class ModelsViewModel(
         observeActiveModel()
         observeSettings()
         observeTheme()
+        observeApiKey()
+        observeGeminiModel()
+        observeProviderApiKeys()
+    }
+
+    private fun observeProviderApiKeys() {
+        viewModelScope.launch {
+            settingsRepository.getAllProviderApiKeys().collect { keysMap ->
+                _uiState.update { it.copy(providerApiKeys = keysMap) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.getCustomOpenAiEndpoint().collect { endpoint ->
+                _uiState.update { it.copy(customOpenAiEndpoint = endpoint) }
+            }
+        }
+    }
+
+    private fun observeApiKey() {
+        viewModelScope.launch {
+            settingsRepository.getApiKey().collect { key ->
+                _uiState.update { it.copy(apiKey = key) }
+            }
+        }
+    }
+
+    private fun observeGeminiModel() {
+        viewModelScope.launch {
+            settingsRepository.getSelectedGeminiModel().collect { model ->
+                _uiState.update { it.copy(selectedGeminiModel = model) }
+            }
+        }
     }
 
     private fun observeModels() {
@@ -272,6 +304,60 @@ class ModelsViewModel(
         viewModelScope.launch {
             settingsRepository.setAppTheme(theme)
             _uiState.update { it.copy(appTheme = theme) }
+        }
+    }
+
+    fun updateApiKey(apiKey: String) {
+        viewModelScope.launch {
+            settingsRepository.updateApiKey(apiKey)
+            _uiState.update {
+                it.copy(
+                    apiKey = apiKey.ifBlank { null },
+                    statusMessage = if (apiKey.isNotBlank()) "Clave API de Gemini guardada." else "Clave API eliminada."
+                )
+            }
+        }
+    }
+
+    fun updateProviderApiKey(providerId: String, apiKey: String) {
+        viewModelScope.launch {
+            settingsRepository.updateProviderApiKey(providerId, apiKey)
+            _uiState.update {
+                val updatedKeys = it.providerApiKeys.toMutableMap()
+                if (apiKey.isBlank()) {
+                    updatedKeys.remove(providerId.lowercase())
+                } else {
+                    updatedKeys[providerId.lowercase()] = apiKey.trim()
+                }
+                it.copy(
+                    providerApiKeys = updatedKeys,
+                    statusMessage = if (apiKey.isNotBlank()) "Clave API de $providerId guardada." else "Clave API de $providerId eliminada."
+                )
+            }
+        }
+    }
+
+    fun updateCustomOpenAiEndpoint(endpoint: String) {
+        viewModelScope.launch {
+            settingsRepository.updateCustomOpenAiEndpoint(endpoint)
+            _uiState.update {
+                it.copy(
+                    customOpenAiEndpoint = endpoint.ifBlank { null },
+                    statusMessage = "Endpoint personalizado actualizado."
+                )
+            }
+        }
+    }
+
+    fun updateSelectedGeminiModel(model: String) {
+        viewModelScope.launch {
+            settingsRepository.updateSelectedGeminiModel(model)
+            _uiState.update {
+                it.copy(
+                    selectedGeminiModel = model,
+                    statusMessage = "Modelo activo: $model"
+                )
+            }
         }
     }
 

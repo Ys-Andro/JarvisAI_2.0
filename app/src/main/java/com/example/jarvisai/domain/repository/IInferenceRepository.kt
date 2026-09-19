@@ -17,7 +17,9 @@ interface IInferenceRepository {
     fun generateCompletionStream(
         prompt: String,
         conversationHistory: List<Message>,
-        settings: GenerationSettings
+        settings: GenerationSettings,
+        imageBase64: String? = null,
+        imageMimeType: String? = null
     ): Flow<String>
 
     suspend fun stopGeneration()

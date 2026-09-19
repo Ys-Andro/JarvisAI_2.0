@@ -6,10 +6,10 @@ import com.example.jarvisai.data.local.database.dao.ConversationDao
 import com.example.jarvisai.data.local.database.dao.MessageDao
 import com.example.jarvisai.data.local.database.dao.ModelDao
 import com.example.jarvisai.data.local.datastore.AppPreferences
-import com.example.jarvisai.data.native.LlamaEngine
+import com.example.jarvisai.data.api.gemini.GeminiApiClient
 import com.example.jarvisai.data.repository.AndroidTtsRepository
 import com.example.jarvisai.data.repository.ConversationRepositoryImpl
-import com.example.jarvisai.data.repository.LlamaInferenceRepository
+import com.example.jarvisai.data.repository.GeminiInferenceRepository
 import com.example.jarvisai.data.repository.ModelRepositoryImpl
 import com.example.jarvisai.data.repository.SettingsRepositoryImpl
 import com.example.jarvisai.domain.repository.IConversationRepository
@@ -43,8 +43,16 @@ class AppContainer(private val context: Context) {
         AppPreferences(context)
     }
 
-    val llamaEngine: LlamaEngine by lazy {
-        LlamaEngine()
+    val geminiApiClient: GeminiApiClient by lazy {
+        GeminiApiClient()
+    }
+
+    val universalApiClient: com.example.jarvisai.data.api.multi.UniversalAiApiClient by lazy {
+        com.example.jarvisai.data.api.multi.UniversalAiApiClient(geminiApiClient)
+    }
+
+    val settingsRepository: ISettingsRepository by lazy {
+        SettingsRepositoryImpl(appPreferences)
     }
 
     val conversationRepository: IConversationRepository by lazy {
@@ -52,15 +60,11 @@ class AppContainer(private val context: Context) {
     }
 
     val inferenceRepository: IInferenceRepository by lazy {
-        LlamaInferenceRepository(llamaEngine)
+        GeminiInferenceRepository(geminiApiClient, universalApiClient, settingsRepository)
     }
 
     val modelRepository: IModelRepository by lazy {
         ModelRepositoryImpl(modelDao)
-    }
-
-    val settingsRepository: ISettingsRepository by lazy {
-        SettingsRepositoryImpl(appPreferences)
     }
 
     val ttsRepository: ITtsRepository by lazy {

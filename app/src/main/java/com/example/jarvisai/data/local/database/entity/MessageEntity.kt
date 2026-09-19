@@ -30,5 +30,6 @@ data class MessageEntity(
     val timestamp: Long = System.currentTimeMillis(),
     val tokensCount: Int = 0,
     val generationDurationMs: Long = 0L,
-    val tokensPerSecond: Float = 0f
+    val tokensPerSecond: Float = 0f,
+    val imageUri: String? = null
 )

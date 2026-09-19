@@ -2,6 +2,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
+  alias(libs.plugins.secrets)
 }
 
 android {
@@ -16,30 +17,11 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-    ndk {
-      abiFilters.clear()
-      abiFilters.add("arm64-v8a")
-    }
-
-    externalNativeBuild {
-      cmake {
-        cppFlags.addAll(listOf("-std=c++17", "-O3", "-fexceptions", "-frtti"))
-        arguments.addAll(
-          listOf(
-            "-DANDROID_STL=c++_shared",
-            "-DANDROID_ARM_NEON=TRUE"
-          )
-        )
-      }
-    }
   }
 
-  externalNativeBuild {
-    cmake {
-      path = file("src/main/cpp/CMakeLists.txt")
-      version = "3.22.1"
-    }
+  secrets {
+    propertiesFileName = ".env"
+    defaultPropertiesFileName = ".env.example"
   }
 
   signingConfigs {
@@ -120,6 +102,9 @@ dependencies {
   // Coroutines
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
+
+  // Image Loading
+  implementation(libs.coil.compose)
 
   // Testing
   testImplementation(libs.androidx.compose.ui.test.junit4)

@@ -1,15 +1,16 @@
 package com.example.jarvisai.presentation.chat.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
@@ -30,9 +33,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBorder
 import com.example.jarvisai.ui.theme.JarvisBorderGlow
@@ -47,30 +52,81 @@ fun ChatInputBar(
     onInputChange: (String) -> Unit,
     onSendClick: () -> Unit,
     onMicClick: () -> Unit,
+    onPickImageClick: () -> Unit,
+    attachedImageUri: String? = null,
+    onRemoveImageClick: () -> Unit = {},
     isGenerating: Boolean,
     onStopClick: () -> Unit,
     isEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
+        // Preview thumbnail for attached image
+        if (!attachedImageUri.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .padding(bottom = 6.dp)
+                    .size(width = 80.dp, height = 80.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, JarvisPrimary, RoundedCornerShape(10.dp))
+            ) {
+                AsyncImage(
+                    model = attachedImageUri,
+                    contentDescription = "Vista previa imagen",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(3.dp)
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .clickable { onRemoveImageClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Quitar imagen",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
                 .background(JarvisSurfaceVariant)
                 .border(1.dp, if (isGenerating) JarvisBorderGlow else JarvisBorder, RoundedCornerShape(24.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Image Picker Button
+            IconButton(
+                onClick = onPickImageClick,
+                enabled = isEnabled && !isGenerating,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AddPhotoAlternate,
+                    contentDescription = "Adjuntar imagen",
+                    tint = if (attachedImageUri != null) JarvisPrimary else JarvisTextSecondary
+                )
+            }
+
             // Voice Input / Mic Button
             IconButton(
                 onClick = onMicClick,
                 enabled = isEnabled && !isGenerating,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(38.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Mic,
@@ -86,9 +142,9 @@ fun ChatInputBar(
                     .padding(horizontal = 6.dp, vertical = 8.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                if (inputText.isEmpty()) {
+                if (inputText.isEmpty() && attachedImageUri.isNullOrBlank()) {
                     Text(
-                        text = if (isEnabled) "Pregúntale a Jarvis..." else "Carga un modelo para chatear...",
+                        text = if (isEnabled) "Pregúntale a Jarvis..." else "Configura la API Key para chatear...",
                         color = JarvisTextSecondary.copy(alpha = 0.6f),
                         fontSize = 15.sp
                     )
@@ -97,7 +153,7 @@ fun ChatInputBar(
                 BasicTextField(
                     value = inputText,
                     onValueChange = onInputChange,
-                    enabled = isEnabled,
+                    enabled = !isGenerating,
                     textStyle = TextStyle(
                         color = JarvisTextPrimary,
                         fontSize = 15.sp,
@@ -113,7 +169,7 @@ fun ChatInputBar(
             if (isGenerating) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
                         .background(JarvisAccentRed)
                         .clickable { onStopClick() },
@@ -127,19 +183,19 @@ fun ChatInputBar(
                     )
                 }
             } else {
-                val hasContent = inputText.trim().isNotEmpty()
+                val hasContent = inputText.trim().isNotEmpty() || !attachedImageUri.isNullOrBlank()
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
                         .background(
-                            if (hasContent && isEnabled) {
+                            if (hasContent) {
                                 Brush.linearGradient(listOf(JarvisPrimary, Color(0xFF0288D1)))
                             } else {
                                 SolidColor(JarvisBorder)
                             }
                         )
-                        .clickable(enabled = hasContent && isEnabled) {
+                        .clickable(enabled = hasContent) {
                             onSendClick()
                         },
                     contentAlignment = Alignment.Center
@@ -147,7 +203,7 @@ fun ChatInputBar(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Enviar mensaje",
-                        tint = if (hasContent && isEnabled) Color(0xFF001F28) else JarvisTextSecondary.copy(alpha = 0.5f),
+                        tint = if (hasContent) Color(0xFF001F28) else JarvisTextSecondary.copy(alpha = 0.4f),
                         modifier = Modifier.size(18.dp)
                     )
                 }

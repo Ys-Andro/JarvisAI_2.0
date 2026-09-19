@@ -9,5 +9,6 @@ data class Message(
     val tokensCount: Int = 0,
     val generationDurationMs: Long = 0L,
     val tokensPerSecond: Float = 0f,
-    val isStreaming: Boolean = false
+    val isStreaming: Boolean = false,
+    val imageUri: String? = null
 )

@@ -128,6 +128,20 @@ fun MessageBubble(
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Column {
+                    // Multimodal Attached Image if present
+                    if (!message.imageUri.isNullOrBlank()) {
+                        coil.compose.AsyncImage(
+                            model = message.imageUri,
+                            contentDescription = "Imagen adjunta",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .padding(bottom = 8.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    }
+
                     if (message.content.isEmpty() && message.isStreaming) {
                         GeneratingDotsIndicator()
                     } else {
