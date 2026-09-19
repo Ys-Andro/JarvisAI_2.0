@@ -24,6 +24,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SmartToy
@@ -37,6 +40,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -72,11 +76,17 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     viewModel: ModelsViewModel,
     onBackClick: () -> Unit,
+    onNavigateToMemory: () -> Unit,
+    onNavigateToDocuments: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val settings = uiState.settings
     var apiKeyInput by remember(uiState.apiKey) { mutableStateOf(uiState.apiKey ?: "") }
+    var isApiKeysExpanded by remember { mutableStateOf(true) }
+    var isMemoryExpanded by remember { mutableStateOf(true) }
+    var isAgentExpanded by remember { mutableStateOf(true) }
+    var isDocumentsExpanded by remember { mutableStateOf(true) }
 
     Scaffold(
         modifier = modifier
@@ -94,11 +104,111 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Section -1: Long-term Memory
+            item {
+                SettingsSectionCard(
+                    title = "MEMORIA A LARGO PLAZO",
+                    icon = Icons.Default.SmartToy,
+                    isCollapsible = true,
+                    isExpanded = isMemoryExpanded,
+                    onToggleExpand = { isMemoryExpanded = !isMemoryExpanded }
+                ) {
+                    Text(
+                        text = "Jarvis recuerda información importante del usuario (nombre, preferencias, proyectos) entre distintas conversaciones y la integra automáticamente.",
+                        color = JarvisTextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onNavigateToMemory,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "VER Y EDITAR RECUERDOS",
+                            color = JarvisBackground,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            // Section -0.5: Multiple Personalities / Agents
+            item {
+                SettingsSectionCard(
+                    title = "PERSONALIDADES / AGENTES",
+                    icon = Icons.Default.SmartToy,
+                    isCollapsible = true,
+                    isExpanded = isAgentExpanded,
+                    onToggleExpand = { isAgentExpanded = !isAgentExpanded }
+                ) {
+                    Text(
+                        text = "Selecciona la personalidad de Jarvis. Cada agente cuenta con su propio system prompt especializado.",
+                        color = JarvisTextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val agents = com.example.jarvisai.domain.model.Agent.DEFAULT_AGENTS
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (agent in agents) {
+                            val isSelected = uiState.selectedAgentId == agent.id
+                            AgentOptionCard(
+                                agent = agent,
+                                isSelected = isSelected,
+                                onClick = { viewModel.setSelectedAgent(agent.id) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Section -0.2: Analyzed Documents
+            item {
+                SettingsSectionCard(
+                    title = "DOCUMENTOS ANALIZADOS",
+                    icon = Icons.Default.Description,
+                    isCollapsible = true,
+                    isExpanded = isDocumentsExpanded,
+                    onToggleExpand = { isDocumentsExpanded = !isDocumentsExpanded }
+                ) {
+                    Text(
+                        text = "Consulta y lee los documentos PDF, TXT y DOCX analizados por Jarvis. Disponibles tanto con internet como en modo offline.",
+                        color = JarvisTextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onNavigateToDocuments,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "VER DOCUMENTOS ANALIZADOS",
+                            color = JarvisBackground,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
             // Section 0: Multi-provider API Keys & Model Configuration
             item {
                 SettingsSectionCard(
                     title = "CLAVES API POR PROVEEDOR",
-                    icon = Icons.Default.Key
+                    icon = Icons.Default.Key,
+                    isCollapsible = true,
+                    isExpanded = isApiKeysExpanded,
+                    onToggleExpand = { isApiKeysExpanded = !isApiKeysExpanded }
                 ) {
                     Text(
                         text = "Configura de manera independiente las API Keys para cada proveedor (Gemini, OpenAI, DeepSeek, Groq, Anthropic). Cada proveedor almacena su clave de forma segura y aislada.",
@@ -228,7 +338,25 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "GUARDAR EN ${currentProvider.second.uppercase()}",
+                                text = "GUARDAR",
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.verifyApiKey(currentProvider.first, currentKeyInput)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JarvisSurfaceVariant,
+                                contentColor = JarvisPrimary
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "VERIFICAR",
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp
@@ -258,6 +386,17 @@ fun SettingsScreen(
                                 )
                             }
                         }
+                    }
+
+                    if (!uiState.statusMessage.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = uiState.statusMessage!!,
+                            color = if (uiState.statusMessage!!.contains("✓") || uiState.statusMessage!!.contains("guardada")) JarvisAccentGreen else Color(0xFFFF8A80),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
 
                     // Optional Custom Endpoint for OpenAI or Compatible APIs (LocalAI, Ollama, LMStudio, etc.)
@@ -556,6 +695,9 @@ private fun SettingsTopBar(
 private fun SettingsSectionCard(
     title: String,
     icon: ImageVector,
+    isCollapsible: Boolean = false,
+    isExpanded: Boolean = true,
+    onToggleExpand: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Box(
@@ -567,25 +709,47 @@ private fun SettingsSectionCard(
             .padding(16.dp)
     ) {
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = JarvisPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = title,
-                    color = JarvisTextPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (isCollapsible && onToggleExpand != null) {
+                            Modifier.clickable { onToggleExpand() }
+                        } else Modifier
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = JarvisPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = title,
+                        color = JarvisTextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                }
+                if (isCollapsible && onToggleExpand != null) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Contraer" else "Expandir",
+                        tint = JarvisPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(14.dp))
-            content()
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(14.dp))
+                content()
+            }
         }
     }
 }
@@ -628,6 +792,65 @@ private fun SliderSettingRow(
                 inactiveTrackColor = JarvisSurfaceVariant
             )
         )
+    }
+}
+
+@Composable
+private fun AgentOptionCard(
+    agent: com.example.jarvisai.domain.model.Agent,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .border(
+                1.dp,
+                if (isSelected) JarvisPrimary else JarvisBorder,
+                RoundedCornerShape(10.dp)
+            ),
+        color = if (isSelected) JarvisSurfaceVariant else JarvisSurface,
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = agent.icon, fontSize = 24.sp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = agent.name,
+                    color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+                Text(
+                    text = agent.roleDescription,
+                    color = JarvisTextSecondary,
+                    fontSize = 11.sp
+                )
+            }
+            if (isSelected) {
+                Surface(
+                    color = JarvisPrimary,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "ACTIVO",
+                        color = JarvisBackground,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

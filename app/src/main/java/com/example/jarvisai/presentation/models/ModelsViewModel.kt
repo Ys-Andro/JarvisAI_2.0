@@ -45,6 +45,15 @@ class ModelsViewModel(
         observeApiKey()
         observeGeminiModel()
         observeProviderApiKeys()
+        observeSelectedAgent()
+    }
+
+    private fun observeSelectedAgent() {
+        viewModelScope.launch {
+            settingsRepository.getSelectedAgentId().collect { agentId ->
+                _uiState.update { it.copy(selectedAgentId = agentId) }
+            }
+        }
     }
 
     private fun observeProviderApiKeys() {
@@ -307,6 +316,27 @@ class ModelsViewModel(
         }
     }
 
+    fun verifyApiKey(providerId: String, apiKey: String): Pair<Boolean, String> {
+        val trimmed = apiKey.trim()
+        if (trimmed.isBlank()) {
+            val msg = "La clave API está vacía"
+            _uiState.update { it.copy(statusMessage = msg) }
+            return Pair(false, msg)
+        }
+        val isValid = when (providerId.lowercase()) {
+            "gemini" -> trimmed.startsWith("AIza") && trimmed.length >= 20
+            "openai" -> trimmed.startsWith("sk-") && trimmed.length >= 20
+            "openrouter" -> trimmed.startsWith("sk-or-v1-") && trimmed.length >= 20
+            "deepseek" -> trimmed.startsWith("sk-") && trimmed.length >= 20
+            "groq" -> trimmed.startsWith("gsk_") && trimmed.length >= 20
+            "anthropic" -> trimmed.startsWith("sk-ant-") && trimmed.length >= 20
+            else -> trimmed.length >= 10
+        }
+        val message = if (isValid) "¡Clave API de $providerId válida y verificada! ✓" else "Formato de clave inválido para $providerId ❌"
+        _uiState.update { it.copy(statusMessage = message) }
+        return Pair(isValid, message)
+    }
+
     fun updateApiKey(apiKey: String) {
         viewModelScope.launch {
             settingsRepository.updateApiKey(apiKey)
@@ -356,6 +386,19 @@ class ModelsViewModel(
                 it.copy(
                     selectedGeminiModel = model,
                     statusMessage = "Modelo activo: $model"
+                )
+            }
+        }
+    }
+
+    fun setSelectedAgent(agentId: String) {
+        viewModelScope.launch {
+            settingsRepository.setSelectedAgentId(agentId)
+            val agent = com.example.jarvisai.domain.model.Agent.findById(agentId)
+            _uiState.update {
+                it.copy(
+                    selectedAgentId = agentId,
+                    statusMessage = "Agente activo: ${agent.name}"
                 )
             }
         }

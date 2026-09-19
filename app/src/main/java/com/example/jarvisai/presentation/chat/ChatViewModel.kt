@@ -11,6 +11,7 @@ import com.example.jarvisai.domain.model.Message
 import com.example.jarvisai.domain.model.ModelProvider
 import com.example.jarvisai.domain.model.Role
 import com.example.jarvisai.domain.repository.IConversationRepository
+import com.example.jarvisai.domain.repository.IDocumentRepository
 import com.example.jarvisai.domain.repository.IInferenceRepository
 import com.example.jarvisai.domain.repository.ISettingsRepository
 import com.example.jarvisai.domain.repository.ITtsRepository
@@ -29,7 +30,8 @@ class ChatViewModel(
     private val conversationRepository: IConversationRepository,
     private val inferenceRepository: IInferenceRepository,
     private val settingsRepository: ISettingsRepository,
-    private val ttsRepository: ITtsRepository
+    private val ttsRepository: ITtsRepository,
+    private val documentRepository: IDocumentRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -122,6 +124,29 @@ class ChatViewModel(
                 attachedImageUri = null,
                 attachedImageBase64 = null,
                 attachedImageMimeType = null
+            )
+        }
+    }
+
+    fun attachDocument(title: String, fileType: String, content: String, uriString: String? = null) {
+        viewModelScope.launch {
+            documentRepository.saveDocument(title, fileType, content, uriString)
+            _uiState.update {
+                it.copy(
+                    attachedDocumentTitle = title,
+                    attachedDocumentType = fileType,
+                    attachedDocumentContent = content
+                )
+            }
+        }
+    }
+
+    fun removeAttachedDocument() {
+        _uiState.update {
+            it.copy(
+                attachedDocumentTitle = null,
+                attachedDocumentType = null,
+                attachedDocumentContent = null
             )
         }
     }
@@ -274,6 +299,9 @@ class ChatViewModel(
         val attachedUri = _uiState.value.attachedImageUri
         val attachedBase64 = _uiState.value.attachedImageBase64
         val attachedMime = _uiState.value.attachedImageMimeType
+        val docTitle = _uiState.value.attachedDocumentTitle
+        val docType = _uiState.value.attachedDocumentType
+        val docContent = _uiState.value.attachedDocumentContent
 
         _uiState.update {
             it.copy(
@@ -281,8 +309,20 @@ class ChatViewModel(
                 attachedImageUri = null,
                 attachedImageBase64 = null,
                 attachedImageMimeType = null,
+                attachedDocumentTitle = null,
+                attachedDocumentType = null,
+                attachedDocumentContent = null,
                 errorMessage = null
             )
+        }
+
+        val effectivePrompt = if (!docContent.isNullOrBlank()) {
+            buildString {
+                append("[DOCUMENTO ADJUNTO: $docTitle ($docType)]\n$docContent\n\n")
+                append("Pregunta o instrucción sobre el documento: $prompt")
+            }
+        } else {
+            prompt
         }
 
         viewModelScope.launch {
@@ -291,7 +331,7 @@ class ChatViewModel(
                 id = UUID.randomUUID().toString(),
                 conversationId = conversationId,
                 role = Role.USER,
-                content = prompt,
+                content = if (docTitle != null) "📄 [Documento: $docTitle]\n$prompt" else prompt,
                 timestamp = System.currentTimeMillis(),
                 imageUri = attachedUri
             )
@@ -324,7 +364,7 @@ class ChatViewModel(
             // 5. Launch native token generation streaming
             executeInferenceStream(
                 assistantMsgId = assistantMsgId,
-                prompt = prompt,
+                prompt = effectivePrompt,
                 history = history,
                 settings = settings,
                 imageBase64 = attachedBase64,

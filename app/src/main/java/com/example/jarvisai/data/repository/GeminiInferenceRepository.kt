@@ -37,6 +37,7 @@ class GeminiInferenceRepository(
     private val geminiApiClient: GeminiApiClient,
     private val universalApiClient: UniversalAiApiClient,
     private val settingsRepository: ISettingsRepository,
+    private val memoryRepository: com.example.jarvisai.domain.repository.IMemoryRepository,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : IInferenceRepository {
 
@@ -137,6 +138,31 @@ class GeminiInferenceRepository(
             return@flow
         }
 
+        // Fetch active agent personality and long-term memories
+        val agentId = settingsRepository.getSelectedAgentId().first()
+        val agent = com.example.jarvisai.domain.model.Agent.findById(agentId)
+        val memories = memoryRepository.getAllMemories().first()
+
+        val memoryContext = if (memories.isNotEmpty()) {
+            buildString {
+                append("\n\n[MEMORIA A LARGO PLAZO Y DATOS RELEVANTES DEL USUARIO]:\n")
+                for (m in memories) {
+                    append("- ${m.key}: ${m.value} (${m.category})\n")
+                }
+            }
+        } else ""
+
+        val combinedSystemPrompt = buildString {
+            append(agent.systemPrompt)
+            val userPrompt = settings.systemPrompt
+            if (userPrompt.isNotBlank() && !userPrompt.contains("You are Jarvis") && userPrompt != "Eres Jarvis, un asistente de IA avanzado, eficiente, sofisticado y servicial inspirado en el asistente de Iron Man.") {
+                append("\n\n$userPrompt")
+            }
+            append(memoryContext)
+        }
+
+        val effectiveSettings = settings.copy(systemPrompt = combinedSystemPrompt)
+
         val customBaseUrl = if (modelDef.provider == com.example.jarvisai.domain.model.ModelProvider.CUSTOM_OPENAI) {
             settingsRepository.getCustomOpenAiEndpoint().first()
         } else null
@@ -165,7 +191,7 @@ class GeminiInferenceRepository(
             model = modelDef,
             prompt = prompt,
             history = conversationHistory,
-            settings = settings,
+            settings = effectiveSettings,
             customBaseUrl = customBaseUrl,
             imageBase64 = imageBase64,
             imageMimeType = imageMimeType
@@ -201,8 +227,14 @@ class GeminiInferenceRepository(
         }
         .catch { e ->
             Log.w(TAG, "AI stream issue: ${e.message}")
-            _inferenceState.value = InferenceState.Error(e.message ?: "Error en la llamada a la API")
-            emit("❌ Error en la generación: ${e.message ?: "Error de comunicación con el servicio"}")
+            val errorMsg = e.message ?: ""
+            val friendlyMsg = if (errorMsg.contains("429") || errorMsg.contains("503") || errorMsg.contains("overloaded") || errorMsg.contains("quota") || errorMsg.contains("resource_exhausted")) {
+                "⚠️ La API del modelo está temporalmente sobrecargada o sin cuota disponible (Límite de peticiones excedido). Puedes consultar tu historial de conversaciones, notas de memoria y documentos analizados sin conexión (Modo Offline) mientras se restablece el servicio."
+            } else {
+                "❌ Error en la generación: ${e.message ?: "Error de comunicación con el servicio"}"
+            }
+            _inferenceState.value = InferenceState.Error(friendlyMsg)
+            emit(friendlyMsg)
         }
         .flowOn(dispatcher)
 

@@ -49,7 +49,8 @@ class MainActivity : ComponentActivity() {
                     JarvisNavHost(
                         chatViewModel = chatViewModel,
                         libraryViewModel = libraryViewModel,
-                        modelsViewModel = modelsViewModel
+                        modelsViewModel = modelsViewModel,
+                        viewModelFactory = viewModelFactory
                     )
                 }
             }

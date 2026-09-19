@@ -5,4 +5,6 @@ sealed class Screen(val route: String) {
     object Library : Screen("library_screen")
     object Models : Screen("models_screen")
     object Settings : Screen("settings_screen")
+    object Memory : Screen("memory_screen")
+    object Documents : Screen("documents_screen")
 }

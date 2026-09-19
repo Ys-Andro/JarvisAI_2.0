@@ -10,10 +10,16 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jarvisai.presentation.JarvisViewModelFactory
 import com.example.jarvisai.presentation.chat.ChatScreen
 import com.example.jarvisai.presentation.chat.ChatViewModel
+import com.example.jarvisai.presentation.documents.DocumentsScreen
+import com.example.jarvisai.presentation.documents.DocumentsViewModel
 import com.example.jarvisai.presentation.library.LibraryScreen
 import com.example.jarvisai.presentation.library.LibraryViewModel
+import com.example.jarvisai.presentation.memory.MemoryScreen
+import com.example.jarvisai.presentation.memory.MemoryViewModel
 import com.example.jarvisai.presentation.models.ModelsScreen
 import com.example.jarvisai.presentation.models.ModelsViewModel
 import com.example.jarvisai.presentation.settings.SettingsScreen
@@ -23,6 +29,7 @@ fun JarvisNavHost(
     chatViewModel: ChatViewModel,
     libraryViewModel: LibraryViewModel,
     modelsViewModel: ModelsViewModel,
+    viewModelFactory: JarvisViewModelFactory,
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier
 ) {
@@ -75,6 +82,32 @@ fun JarvisNavHost(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 viewModel = modelsViewModel,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onNavigateToMemory = {
+                    navController.navigate(Screen.Memory.route)
+                },
+                onNavigateToDocuments = {
+                    navController.navigate(Screen.Documents.route)
+                }
+            )
+        }
+
+        composable(Screen.Memory.route) {
+            val memoryViewModel: MemoryViewModel = viewModel(factory = viewModelFactory)
+            MemoryScreen(
+                viewModel = memoryViewModel,
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Documents.route) {
+            val documentsViewModel: DocumentsViewModel = viewModel(factory = viewModelFactory)
+            DocumentsScreen(
+                viewModel = documentsViewModel,
                 onBackClick = {
                     navController.popBackStack()
                 }

@@ -13,6 +13,7 @@ data class ModelsUiState(
     val providerApiKeys: Map<String, String> = emptyMap(),
     val customOpenAiEndpoint: String? = null,
     val selectedGeminiModel: String = "gemini-2.5-flash",
+    val selectedAgentId: String = "jarvis_prime",
     val isValidatingApiKey: Boolean = false,
     val settings: GenerationSettings = GenerationSettings(),
     val appTheme: AppThemeMode = AppThemeMode.DARK_JARVIS,

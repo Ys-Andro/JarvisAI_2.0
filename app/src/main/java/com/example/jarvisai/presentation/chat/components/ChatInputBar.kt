@@ -1,26 +1,18 @@
 package com.example.jarvisai.presentation.chat.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
@@ -35,16 +27,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.jarvisai.ui.theme.JarvisAccentRed
-import com.example.jarvisai.ui.theme.JarvisBorder
-import com.example.jarvisai.ui.theme.JarvisBorderGlow
-import com.example.jarvisai.ui.theme.JarvisPrimary
-import com.example.jarvisai.ui.theme.JarvisSurfaceVariant
-import com.example.jarvisai.ui.theme.JarvisTextPrimary
-import com.example.jarvisai.ui.theme.JarvisTextSecondary
+import com.example.jarvisai.ui.theme.*
 
 @Composable
 fun ChatInputBar(
@@ -55,6 +43,10 @@ fun ChatInputBar(
     onPickImageClick: () -> Unit,
     attachedImageUri: String? = null,
     onRemoveImageClick: () -> Unit = {},
+    attachedDocumentTitle: String? = null,
+    attachedDocumentType: String? = null,
+    onPickDocumentClick: () -> Unit = {},
+    onRemoveDocumentClick: () -> Unit = {},
     isGenerating: Boolean,
     onStopClick: () -> Unit,
     isEnabled: Boolean = true,
@@ -100,6 +92,54 @@ fun ChatInputBar(
             }
         }
 
+        // Preview badge for attached document
+        if (!attachedDocumentTitle.isNullOrBlank()) {
+            Row(
+                modifier = Modifier
+                    .padding(bottom = 6.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(JarvisSurfaceVariant)
+                    .border(1.dp, JarvisPrimary, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = null,
+                    tint = JarvisPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = attachedDocumentTitle,
+                        color = JarvisTextPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "Documento ${attachedDocumentType ?: "TXT"} adjunto para análisis",
+                        color = JarvisTextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+                IconButton(
+                    onClick = onRemoveDocumentClick,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Quitar documento",
+                        tint = JarvisTextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -119,6 +159,19 @@ fun ChatInputBar(
                     imageVector = Icons.Default.AddPhotoAlternate,
                     contentDescription = "Adjuntar imagen",
                     tint = if (attachedImageUri != null) JarvisPrimary else JarvisTextSecondary
+                )
+            }
+
+            // Document Picker Button
+            IconButton(
+                onClick = onPickDocumentClick,
+                enabled = isEnabled && !isGenerating,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AttachFile,
+                    contentDescription = "Adjuntar documento (PDF, TXT, DOCX)",
+                    tint = if (!attachedDocumentTitle.isNullOrBlank()) JarvisPrimary else JarvisTextSecondary
                 )
             }
 
@@ -142,11 +195,11 @@ fun ChatInputBar(
                     .padding(horizontal = 6.dp, vertical = 8.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                if (inputText.isEmpty() && attachedImageUri.isNullOrBlank()) {
+                if (inputText.isEmpty() && attachedImageUri.isNullOrBlank() && attachedDocumentTitle.isNullOrBlank()) {
                     Text(
-                        text = if (isEnabled) "Pregúntale a Jarvis..." else "Configura la API Key para chatear...",
+                        text = if (isEnabled) "Pregúntale a Jarvis o adjunta docs..." else "Configura la API Key para chatear...",
                         color = JarvisTextSecondary.copy(alpha = 0.6f),
-                        fontSize = 15.sp
+                        fontSize = 14.sp
                     )
                 }
 
@@ -183,7 +236,7 @@ fun ChatInputBar(
                     )
                 }
             } else {
-                val hasContent = inputText.trim().isNotEmpty() || !attachedImageUri.isNullOrBlank()
+                val hasContent = inputText.trim().isNotEmpty() || !attachedImageUri.isNullOrBlank() || !attachedDocumentTitle.isNullOrBlank()
                 Box(
                     modifier = Modifier
                         .size(38.dp)

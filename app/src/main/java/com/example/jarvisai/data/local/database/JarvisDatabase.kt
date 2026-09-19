@@ -5,19 +5,25 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.jarvisai.data.local.database.dao.ConversationDao
+import com.example.jarvisai.data.local.database.dao.DocumentDao
+import com.example.jarvisai.data.local.database.dao.MemoryDao
 import com.example.jarvisai.data.local.database.dao.MessageDao
 import com.example.jarvisai.data.local.database.dao.ModelDao
 import com.example.jarvisai.data.local.database.entity.ConversationEntity
+import com.example.jarvisai.data.local.database.entity.DocumentEntity
 import com.example.jarvisai.data.local.database.entity.LocalGgufModelEntity
+import com.example.jarvisai.data.local.database.entity.MemoryEntity
 import com.example.jarvisai.data.local.database.entity.MessageEntity
 
 @Database(
     entities = [
         ConversationEntity::class,
         MessageEntity::class,
-        LocalGgufModelEntity::class
+        LocalGgufModelEntity::class,
+        MemoryEntity::class,
+        DocumentEntity::class
     ],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 abstract class JarvisDatabase : RoomDatabase() {
@@ -25,6 +31,8 @@ abstract class JarvisDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
     abstract fun messageDao(): MessageDao
     abstract fun modelDao(): ModelDao
+    abstract fun memoryDao(): MemoryDao
+    abstract fun documentDao(): DocumentDao
 
     companion object {
         const val DATABASE_NAME = "jarvis_ai.db"

@@ -44,6 +44,7 @@ class AppPreferences(private val context: Context) {
         val TTS_SPEED = floatPreferencesKey("tts_speed")
         val TTS_PITCH = floatPreferencesKey("tts_pitch")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
     }
 
     private val safePreferences: Flow<Preferences> = dataStore.data
@@ -117,6 +118,10 @@ class AppPreferences(private val context: Context) {
         } catch (_: IllegalArgumentException) {
             AppThemeMode.DARK_JARVIS
         }
+    }
+
+    val selectedAgentId: Flow<String> = safePreferences.map { preferences ->
+        preferences[Keys.SELECTED_AGENT_ID] ?: "jarvis_prime"
     }
 
     suspend fun setSelectedModelId(modelId: String?) {
@@ -228,6 +233,12 @@ class AppPreferences(private val context: Context) {
     suspend fun setAppTheme(theme: AppThemeMode) {
         dataStore.edit { preferences ->
             preferences[Keys.THEME_MODE] = theme.name
+        }
+    }
+
+    suspend fun setSelectedAgentId(agentId: String) {
+        dataStore.edit { preferences ->
+            preferences[Keys.SELECTED_AGENT_ID] = agentId
         }
     }
 

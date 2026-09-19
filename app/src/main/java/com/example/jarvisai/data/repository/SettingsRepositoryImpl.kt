@@ -61,4 +61,12 @@ class SettingsRepositoryImpl(
     override suspend fun setAppTheme(theme: AppThemeMode) {
         appPreferences.setAppTheme(theme)
     }
+
+    override fun getSelectedAgentId(): Flow<String> {
+        return appPreferences.selectedAgentId
+    }
+
+    override suspend fun setSelectedAgentId(agentId: String) {
+        appPreferences.setSelectedAgentId(agentId)
+    }
 }

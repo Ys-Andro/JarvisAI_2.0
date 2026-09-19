@@ -126,6 +126,28 @@ fun ChatScreen(
         }
     }
 
+    // Document Picker launcher for PDF, TXT, DOCX
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+
+            val parsed = com.example.jarvisai.data.util.DocumentParser.parseDocument(context, uri)
+            viewModel.attachDocument(
+                title = parsed.title,
+                fileType = parsed.fileType,
+                content = parsed.content,
+                uriString = uri.toString()
+            )
+        }
+    }
+
     // Auto-scroll to bottom on new message or streaming update
     LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.content?.length) {
         if (uiState.messages.isNotEmpty()) {
@@ -171,6 +193,7 @@ fun ChatScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .imePadding()
                     .navigationBarsPadding()
             ) {
                 // Warning if current selected provider has no API key
@@ -207,6 +230,21 @@ fun ChatScreen(
                     },
                     attachedImageUri = uiState.attachedImageUri,
                     onRemoveImageClick = { viewModel.clearAttachedImage() },
+                    attachedDocumentTitle = uiState.attachedDocumentTitle,
+                    attachedDocumentType = uiState.attachedDocumentType,
+                    onPickDocumentClick = {
+                        documentPickerLauncher.launch(
+                            arrayOf(
+                                "application/pdf",
+                                "text/plain",
+                                "application/msword",
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                "application/octet-stream",
+                                "*/*"
+                            )
+                        )
+                    },
+                    onRemoveDocumentClick = { viewModel.removeAttachedDocument() },
                     isGenerating = uiState.inferenceStatus is ChatInferenceStatus.Generating,
                     onStopClick = viewModel::stopGeneration,
                     isEnabled = uiState.isModelLoaded
@@ -230,7 +268,7 @@ fun ChatScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
                 ) {
                     items(
                         items = uiState.messages,

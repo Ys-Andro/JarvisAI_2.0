@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import android.content.Context
 import com.example.jarvisai.di.AppContainer
 import com.example.jarvisai.presentation.chat.ChatViewModel
+import com.example.jarvisai.presentation.documents.DocumentsViewModel
 import com.example.jarvisai.presentation.library.LibraryViewModel
+import com.example.jarvisai.presentation.memory.MemoryViewModel
 import com.example.jarvisai.presentation.models.ModelsViewModel
 
 class JarvisViewModelFactory(
@@ -21,7 +23,8 @@ class JarvisViewModelFactory(
                     conversationRepository = appContainer.conversationRepository,
                     inferenceRepository = appContainer.inferenceRepository,
                     settingsRepository = appContainer.settingsRepository,
-                    ttsRepository = appContainer.ttsRepository
+                    ttsRepository = appContainer.ttsRepository,
+                    documentRepository = appContainer.documentRepository
                 ) as T
             }
             modelClass.isAssignableFrom(LibraryViewModel::class.java) -> {
@@ -35,6 +38,16 @@ class JarvisViewModelFactory(
                     inferenceRepository = appContainer.inferenceRepository,
                     settingsRepository = appContainer.settingsRepository,
                     context = context
+                ) as T
+            }
+            modelClass.isAssignableFrom(MemoryViewModel::class.java) -> {
+                MemoryViewModel(
+                    memoryRepository = appContainer.memoryRepository
+                ) as T
+            }
+            modelClass.isAssignableFrom(DocumentsViewModel::class.java) -> {
+                DocumentsViewModel(
+                    documentRepository = appContainer.documentRepository
                 ) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

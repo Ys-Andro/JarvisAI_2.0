@@ -18,4 +18,6 @@ interface ISettingsRepository {
     suspend fun updateSelectedGeminiModel(model: String)
     fun getAppTheme(): Flow<AppThemeMode>
     suspend fun setAppTheme(theme: AppThemeMode)
+    fun getSelectedAgentId(): Flow<String>
+    suspend fun setSelectedAgentId(agentId: String)
 }
