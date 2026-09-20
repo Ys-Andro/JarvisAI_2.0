@@ -623,37 +623,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 4: Tema Visual
-            item {
-                SettingsSectionCard(
-                    title = "TEMA VISUAL",
-                    icon = Icons.Default.Palette
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ThemeOptionChip(
-                            label = "DARK JARVIS",
-                            isSelected = uiState.appTheme == AppThemeMode.DARK_JARVIS,
-                            onClick = { viewModel.setAppTheme(AppThemeMode.DARK_JARVIS) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        ThemeOptionChip(
-                            label = "AMOLED BLUE",
-                            isSelected = uiState.appTheme == AppThemeMode.AMOLED_BLUE,
-                            onClick = { viewModel.setAppTheme(AppThemeMode.AMOLED_BLUE) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        ThemeOptionChip(
-                            label = "CYBER SLATE",
-                            isSelected = uiState.appTheme == AppThemeMode.CYBER_TACTICAL,
-                            onClick = { viewModel.setAppTheme(AppThemeMode.CYBER_TACTICAL) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
+
         }
     }
 }
@@ -854,32 +824,4 @@ private fun AgentOptionCard(
     }
 }
 
-@Composable
-private fun ThemeOptionChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (isSelected) JarvisPrimary else JarvisSurfaceVariant)
-            .border(
-                1.dp,
-                if (isSelected) JarvisBorderGlow else JarvisBorder,
-                RoundedCornerShape(10.dp)
-            )
-            .clickable { onClick() }
-            .padding(vertical = 10.dp, horizontal = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = if (isSelected) Color(0xFF001F28) else JarvisTextSecondary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
-        )
-    }
-}
+

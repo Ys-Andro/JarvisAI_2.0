@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
@@ -312,52 +313,30 @@ private fun ChatTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Model Selector Dropdown trigger
+        // Model Selector Dropdown trigger (Minimalist 3 lines only)
         Box {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xFF0F1E33))
-                    .border(1.dp, JarvisBorder, RoundedCornerShape(8.dp))
+                    .border(1.dp, JarvisBorder, RoundedCornerShape(20.dp))
                     .clickable { isDropdownExpanded = true }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Desplegar modelos",
+                    tint = JarvisPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
                         .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentRed)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = currentModel.name,
-                            color = JarvisPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Cambiar modelo",
-                            tint = JarvisPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Text(
-                        text = "${currentModel.provider.displayName} • ${if (isModelLoaded) "Listo" else "Falta API Key"}",
-                        color = if (isModelLoaded) JarvisTextSecondary else Color(0xFFFF8A80),
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1
-                    )
-                }
             }
 
             DropdownMenu(

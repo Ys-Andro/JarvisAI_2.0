@@ -38,44 +38,6 @@ private val JarvisDarkColorScheme = darkColorScheme(
     onError = Color.White
 )
 
-private val JarvisAmoledColorScheme = darkColorScheme(
-    primary = JarvisPrimary,
-    onPrimary = JarvisOnPrimary,
-    primaryContainer = Color(0xFF00363A),
-    onPrimaryContainer = JarvisPrimaryLight,
-    secondary = JarvisPrimaryDark,
-    onSecondary = Color.White,
-    background = Color.Black,
-    onBackground = JarvisTextPrimary,
-    surface = Color(0xFF080808),
-    onSurface = JarvisTextPrimary,
-    surfaceVariant = Color(0xFF121212),
-    onSurfaceVariant = JarvisTextSecondary,
-    outline = Color(0xFF222222),
-    outlineVariant = Color(0xFF181818),
-    error = JarvisAccentRed,
-    onError = Color.White
-)
-
-private val JarvisCyberColorScheme = darkColorScheme(
-    primary = Color(0xFF00E5FF),
-    onPrimary = Color(0xFF001F28),
-    primaryContainer = Color(0xFF0D2538),
-    onPrimaryContainer = Color(0xFF80D8FF),
-    secondary = Color(0xFF2979FF),
-    onSecondary = Color.White,
-    background = Color(0xFF0B0F19),
-    onBackground = JarvisTextPrimary,
-    surface = Color(0xFF111827),
-    onSurface = JarvisTextPrimary,
-    surfaceVariant = Color(0xFF1F293D),
-    onSurfaceVariant = JarvisTextSecondary,
-    outline = Color(0xFF2B3A52),
-    outlineVariant = Color(0xFF1A2332),
-    error = JarvisAccentRed,
-    onError = Color.White
-)
-
 val JarvisTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.Monospace,
@@ -127,14 +89,8 @@ fun JarvisAiTheme(
     themeMode: AppThemeMode = AppThemeMode.DARK_JARVIS,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when (themeMode) {
-        AppThemeMode.DARK_JARVIS -> JarvisDarkColorScheme
-        AppThemeMode.AMOLED_BLUE -> JarvisAmoledColorScheme
-        AppThemeMode.CYBER_TACTICAL -> JarvisCyberColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = JarvisDarkColorScheme,
         typography = JarvisTypography,
         shapes = JarvisShapes,
         content = content
