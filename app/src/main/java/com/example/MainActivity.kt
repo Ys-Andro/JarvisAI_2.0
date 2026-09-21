@@ -51,13 +51,15 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(Unit) {
-                permissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.RECORD_AUDIO,
-                        Manifest.permission.CAMERA,
-                        Manifest.permission.CALL_PHONE
-                    )
+                val perms = mutableListOf(
+                    Manifest.permission.RECORD_AUDIO,
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.CALL_PHONE
                 )
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                permissionLauncher.launch(perms.toTypedArray())
             }
 
             JarvisAiTheme(themeMode = modelsUiState.appTheme) {

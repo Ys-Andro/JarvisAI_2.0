@@ -443,6 +443,88 @@ class ChatViewModel(
         }
     }
 
+    fun sendMessageDirect(promptText: String, onResponseComplete: (String) -> Unit = {}) {
+        val prompt = promptText.trim()
+        if (prompt.isEmpty()) return
+
+        val currentModel = CloudAiModel.findById(_uiState.value.selectedModelId)
+        if (!_uiState.value.isModelLoaded) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Falta la API Key de ${currentModel.provider.displayName}."
+                )
+            }
+            return
+        }
+
+        val conversationId = currentConversationId ?: return
+
+        viewModelScope.launch {
+            val userMsg = Message(
+                id = UUID.randomUUID().toString(),
+                conversationId = conversationId,
+                role = Role.USER,
+                content = prompt,
+                timestamp = System.currentTimeMillis()
+            )
+            conversationRepository.insertMessage(userMsg)
+
+            val assistantMsgId = UUID.randomUUID().toString()
+            val initialAssistantMsg = Message(
+                id = assistantMsgId,
+                conversationId = conversationId,
+                role = Role.ASSISTANT,
+                content = "",
+                timestamp = System.currentTimeMillis() + 1,
+                isStreaming = true
+            )
+            conversationRepository.insertMessage(initialAssistantMsg)
+            _uiState.update { it.copy(streamingMessageId = assistantMsgId) }
+
+            val settings = settingsRepository.getSettings().first()
+            val history = _uiState.value.messages
+
+            generationJob?.cancel()
+            generationJob = viewModelScope.launch {
+                val responseBuilder = StringBuilder()
+                val startTime = System.currentTimeMillis()
+                var tokenCount = 0
+
+                inferenceRepository.generateCompletionStream(
+                    prompt = prompt,
+                    conversationHistory = history,
+                    settings = settings
+                )
+                    .catch { error ->
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = error.message,
+                                streamingMessageId = null
+                            )
+                        }
+                    }
+                    .collect { tokenPiece ->
+                        tokenCount++
+                        responseBuilder.append(tokenPiece)
+                        val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1L)
+                        val tokPerSec = (tokenCount.toFloat() / (elapsedMs.toFloat() / 1000f))
+
+                        conversationRepository.updateMessageContent(
+                            messageId = assistantMsgId,
+                            content = responseBuilder.toString(),
+                            tokensPerSec = tokPerSec,
+                            durationMs = elapsedMs
+                        )
+                    }
+
+                _uiState.update { it.copy(streamingMessageId = null) }
+                val finalResponse = responseBuilder.toString()
+                speakText(finalResponse)
+                onResponseComplete(finalResponse)
+            }
+        }
+    }
+
     fun speakText(text: String) {
         viewModelScope.launch {
             val settings = settingsRepository.getSettings().first()

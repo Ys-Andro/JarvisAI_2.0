@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
@@ -92,6 +93,8 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+
+    var showLiveMode by remember { mutableStateOf(false) }
 
     // Speech-To-Text launcher
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
@@ -164,126 +167,142 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(JarvisBackground),
-        containerColor = JarvisBackground,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            ChatTopBar(
-                selectedModelId = uiState.selectedModelId,
-                onModelSelected = { viewModel.selectModel(it) },
-                isModelLoaded = uiState.isModelLoaded,
-                isProviderReady = { uiState.isProviderReady(it) },
-                tokensPerSecond = uiState.tokensPerSecond,
-                onShareClick = {
-                    val exportText = viewModel.getConversationExportText()
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_SUBJECT, "Conversación con Jarvis AI")
-                        putExtra(Intent.EXTRA_TEXT, exportText)
+            .background(JarvisBackground)
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = JarvisBackground,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                ChatTopBar(
+                    selectedModelId = uiState.selectedModelId,
+                    onModelSelected = { viewModel.selectModel(it) },
+                    isModelLoaded = uiState.isModelLoaded,
+                    isProviderReady = { uiState.isProviderReady(it) },
+                    tokensPerSecond = uiState.tokensPerSecond,
+                    onShareClick = {
+                        val exportText = viewModel.getConversationExportText()
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Conversación con Jarvis AI")
+                            putExtra(Intent.EXTRA_TEXT, exportText)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Compartir conversación"))
+                    },
+                    onModelsClick = onNavigateToModels,
+                    onHistoryClick = onNavigateToHistory,
+                    onLiveModeClick = { showLiveMode = true }
+                )
+            },
+            bottomBar = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .navigationBarsPadding()
+                ) {
+                    // Warning if current selected provider has no API key
+                    if (!uiState.isModelLoaded) {
+                        val currentModel = CloudAiModel.findById(uiState.selectedModelId)
+                        NoModelLoadedBanner(
+                            providerName = currentModel.provider.displayName,
+                            onLoadClick = onNavigateToModels
+                        )
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "Compartir conversación"))
-                },
-                onModelsClick = onNavigateToModels,
-                onHistoryClick = onNavigateToHistory
-            )
-        },
-        bottomBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .navigationBarsPadding()
-            ) {
-                // Warning if current selected provider has no API key
-                if (!uiState.isModelLoaded) {
-                    val currentModel = CloudAiModel.findById(uiState.selectedModelId)
-                    NoModelLoadedBanner(
-                        providerName = currentModel.provider.displayName,
-                        onLoadClick = onNavigateToModels
+
+                    ChatInputBar(
+                        inputText = uiState.inputPrompt,
+                        onInputChange = viewModel::onInputChange,
+                        onSendClick = viewModel::sendMessage,
+                        onMicClick = {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla para escribir con Jarvis...")
+                            }
+                            try {
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (_: Exception) {
+                                // STT not supported on this device
+                            }
+                        },
+                        onPickImageClick = {
+                            photoPickerLauncher.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        },
+                        attachedImageUri = uiState.attachedImageUri,
+                        onRemoveImageClick = { viewModel.clearAttachedImage() },
+                        attachedDocumentTitle = uiState.attachedDocumentTitle,
+                        attachedDocumentType = uiState.attachedDocumentType,
+                        onPickDocumentClick = {
+                            documentPickerLauncher.launch(
+                                arrayOf(
+                                    "application/pdf",
+                                    "text/plain",
+                                    "application/msword",
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    "application/octet-stream",
+                                    "*/*"
+                                )
+                            )
+                        },
+                        onRemoveDocumentClick = { viewModel.removeAttachedDocument() },
+                        isGenerating = uiState.inferenceStatus is ChatInferenceStatus.Generating,
+                        onStopClick = viewModel::stopGeneration,
+                        isEnabled = uiState.isModelLoaded
                     )
                 }
-
-                ChatInputBar(
-                    inputText = uiState.inputPrompt,
-                    onInputChange = viewModel::onInputChange,
-                    onSendClick = viewModel::sendMessage,
-                    onMicClick = {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla para escribir con Jarvis...")
-                        }
-                        try {
-                            speechRecognizerLauncher.launch(intent)
-                        } catch (_: Exception) {
-                            // STT not supported on this device
-                        }
-                    },
-                    onPickImageClick = {
-                        photoPickerLauncher.launch(
-                            androidx.activity.result.PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
-                        )
-                    },
-                    attachedImageUri = uiState.attachedImageUri,
-                    onRemoveImageClick = { viewModel.clearAttachedImage() },
-                    attachedDocumentTitle = uiState.attachedDocumentTitle,
-                    attachedDocumentType = uiState.attachedDocumentType,
-                    onPickDocumentClick = {
-                        documentPickerLauncher.launch(
-                            arrayOf(
-                                "application/pdf",
-                                "text/plain",
-                                "application/msword",
-                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                "application/octet-stream",
-                                "*/*"
-                            )
-                        )
-                    },
-                    onRemoveDocumentClick = { viewModel.removeAttachedDocument() },
-                    isGenerating = uiState.inferenceStatus is ChatInferenceStatus.Generating,
-                    onStopClick = viewModel::stopGeneration,
-                    isEnabled = uiState.isModelLoaded
-                )
             }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            if (uiState.messages.isEmpty()) {
-                val currentModel = CloudAiModel.ALL_MODELS.firstOrNull { it.id == uiState.selectedModelId }
-                EmptyChatPlaceholder(
-                    isModelLoaded = uiState.isModelLoaded,
-                    modelName = currentModel?.name ?: uiState.activeModel?.name,
-                    onConfigureModelClick = onNavigateToModels
-                )
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
-                ) {
-                    items(
-                        items = uiState.messages,
-                        key = { it.id }
-                    ) { message ->
-                        MessageBubble(
-                            message = message,
-                            isSpeaking = uiState.isSpeakingTts && message.role != com.example.jarvisai.domain.model.Role.USER,
-                            onSpeakClick = { viewModel.speakText(it) },
-                            onStopSpeakClick = { viewModel.stopTts() }
-                        )
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                if (uiState.messages.isEmpty()) {
+                    val currentModel = CloudAiModel.ALL_MODELS.firstOrNull { it.id == uiState.selectedModelId }
+                    EmptyChatPlaceholder(
+                        isModelLoaded = uiState.isModelLoaded,
+                        modelName = currentModel?.name ?: uiState.activeModel?.name,
+                        onConfigureModelClick = onNavigateToModels
+                    )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
+                    ) {
+                        items(
+                            items = uiState.messages,
+                            key = { it.id }
+                        ) { message ->
+                            MessageBubble(
+                                message = message,
+                                isSpeaking = uiState.isSpeakingTts && message.role != com.example.jarvisai.domain.model.Role.USER,
+                                onSpeakClick = { viewModel.speakText(it) },
+                                onStopSpeakClick = { viewModel.stopTts() }
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        if (showLiveMode) {
+            com.example.jarvisai.presentation.chat.components.JarvisLiveModeDialog(
+                isSpeakingTts = uiState.isSpeakingTts,
+                onUserSpoken = { prompt, onComplete ->
+                    viewModel.sendMessageDirect(prompt, onComplete)
+                },
+                onStopTts = { viewModel.stopTts() },
+                onDismiss = { showLiveMode = false }
+            )
         }
     }
 }
@@ -298,6 +317,7 @@ private fun ChatTopBar(
     onShareClick: () -> Unit,
     onModelsClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    onLiveModeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isDropdownExpanded by remember { mutableStateOf(false) }
@@ -406,6 +426,17 @@ private fun ChatTopBar(
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.padding(end = 4.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onLiveModeClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Modo Live de voz continua",
+                    tint = JarvisPrimary
                 )
             }
 
