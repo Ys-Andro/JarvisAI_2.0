@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
  * Reads API key from BuildConfig (via secrets plugin/.env) or user-configured custom key in Settings.
  */
 class GeminiInferenceRepository(
+    private val context: android.content.Context,
     private val geminiApiClient: GeminiApiClient,
     private val universalApiClient: UniversalAiApiClient,
     private val settingsRepository: ISettingsRepository,
@@ -159,6 +160,22 @@ class GeminiInferenceRepository(
                 append("\n\n$userPrompt")
             }
             append(memoryContext)
+            append("""
+                
+                [CAPACIDAD DE CONTROL TOTAL DEL DISPOSITIVO - JARVIS DEVICE AGENT]:
+                Eres Jarvis, un asistente de IA con capacidad avanzada para controlar el teléfono del usuario en tiempo real en respuesta a comandos de voz o texto en lenguaje natural (similar a Gemini Live). Cuando el usuario pida realizar una acción física o del sistema en el dispositivo (ej. encender linterna, poner alarma, abrir una aplicación, ajustar volumen, hacer llamada, buscar en la web), debes interpretar la orden de forma flexible y emitir al final de tu respuesta un bloque JSON estructurado con este formato exacto:
+                [JARVIS_ACTION: {"action":"FLASHLIGHT","enable":true}]
+                
+                Acciones soportadas:
+                1. {"action":"FLASHLIGHT", "enable": true/false} (Encender o apagar la linterna)
+                2. {"action":"SET_ALARM", "hour": int, "minute": int, "message": "..."} (Programar alarma)
+                3. {"action":"OPEN_APP", "appName": "..."} (Abrir una aplicación instalada como WhatsApp, YouTube, Spotify, Ajustes, etc.)
+                4. {"action":"VOLUME", "level": int 0-100} (Ajustar volumen multimedia)
+                5. {"action":"CALL", "number": "..."} (Abrir marcador telefónico)
+                6. {"action":"WEB_SEARCH", "query": "..."} (Buscar en la web)
+                
+                Responde con sofisticación, naturalidad y ejecuta la acción emitiendo el bloque JSON correspondiente.
+            """.trimIndent())
         }
 
         val effectiveSettings = settings.copy(systemPrompt = combinedSystemPrompt)
@@ -208,6 +225,16 @@ class GeminiInferenceRepository(
             )
 
             emit(tokenChunk)
+        }
+
+        val finalResponse = accumulatedText.toString()
+        val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
+        val matchResult = actionRegex.find(finalResponse)
+        if (matchResult != null) {
+            val jsonPayload = matchResult.groupValues[1]
+            val actionResultMsg = com.example.jarvisai.data.util.DeviceController.executeActionCommand(context, jsonPayload)
+            val confirmation = "\n\n✓ $actionResultMsg"
+            emit(confirmation)
         }
     }
         .onStart {
