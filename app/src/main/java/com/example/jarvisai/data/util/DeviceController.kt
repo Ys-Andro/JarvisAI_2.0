@@ -102,23 +102,32 @@ object DeviceController {
 
     private fun openApp(context: Context, appName: String): String {
         val pm = context.packageManager
-        val query = appName.lowercase()
-        val packages = pm.getInstalledPackages(0)
+        val query = appName.lowercase().trim()
         
-        // Find best match among installed apps
-        val match = packages.firstOrNull { pkg ->
-            val label = pkg.applicationInfo?.loadLabel(pm)?.toString()?.lowercase() ?: ""
-            label.contains(query) || pkg.packageName.lowercase().contains(query)
-        }
-
-        if (match != null) {
-            val launchIntent = pm.getLaunchIntentForPackage(match.packageName)
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(launchIntent)
-                val appTitle = match.applicationInfo?.loadLabel(pm)?.toString() ?: appName
-                return "Abriendo $appTitle, señor."
+        try {
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
             }
+            val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
+            
+            val match = resolveInfos.firstOrNull { resolveInfo ->
+                val label = resolveInfo.loadLabel(pm).toString().lowercase()
+                val pkgName = resolveInfo.activityInfo.packageName.lowercase()
+                label.contains(query) || pkgName.contains(query)
+            }
+
+            if (match != null) {
+                val pkgName = match.activityInfo.packageName
+                val launchIntent = pm.getLaunchIntentForPackage(pkgName)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(launchIntent)
+                    val appTitle = match.loadLabel(pm).toString()
+                    return "Abriendo $appTitle, señor."
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying apps", e)
         }
 
         // Fallback intent by common name
@@ -126,6 +135,7 @@ object DeviceController {
             query.contains("whatsapp") -> pm.getLaunchIntentForPackage("com.whatsapp")
             query.contains("youtube") -> pm.getLaunchIntentForPackage("com.google.android.youtube")
             query.contains("spotify") -> pm.getLaunchIntentForPackage("com.spotify.music")
+            query.contains("instagram") -> pm.getLaunchIntentForPackage("com.instagram.android")
             query.contains("browser") || query.contains("chrome") -> Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
             else -> null
         }
