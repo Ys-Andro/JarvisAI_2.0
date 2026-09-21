@@ -48,6 +48,18 @@ object DeviceController {
                     openWebSearch(context, query)
                     "Buscando '$query' en la web..."
                 }
+                "HOME" -> {
+                    val success = JarvisAccessibilityService.instance?.goHome() == true
+                    if (success) "Viendo pantalla de inicio, señor." else "Para usar esta función, active el Servicio de Accesibilidad de Jarvis en Ajustes > Accesibilidad."
+                }
+                "BACK" -> {
+                    val success = JarvisAccessibilityService.instance?.goBack() == true
+                    if (success) "Regresando..." else "Active el Servicio de Accesibilidad de Jarvis."
+                }
+                "NOTIFICATIONS" -> {
+                    val success = JarvisAccessibilityService.instance?.openNotifications() == true
+                    if (success) "Abriendo barra de notificaciones, señor." else "Active el Servicio de Accesibilidad de Jarvis."
+                }
                 else -> "Acción de dispositivo no reconocida: $action"
             }
         } catch (e: Exception) {

@@ -173,6 +173,9 @@ class GeminiInferenceRepository(
                 4. {"action":"VOLUME", "level": int 0-100} (Ajustar volumen multimedia)
                 5. {"action":"CALL", "number": "..."} (Abrir marcador telefónico)
                 6. {"action":"WEB_SEARCH", "query": "..."} (Buscar en la web)
+                7. {"action":"HOME"} (Ir a la pantalla de inicio)
+                8. {"action":"BACK"} (Regresar / atrás)
+                9. {"action":"NOTIFICATIONS"} (Abrir barra de notificaciones)
                 
                 Responde con sofisticación, naturalidad y ejecuta la acción emitiendo el bloque JSON correspondiente.
             """.trimIndent())

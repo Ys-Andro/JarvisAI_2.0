@@ -1,13 +1,16 @@
 package com.example
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -40,6 +43,22 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val modelsUiState by modelsViewModel.uiState.collectAsState()
+
+            val permissionLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestMultiplePermissions()
+            ) { _ ->
+                // Permissions handled
+            }
+
+            LaunchedEffect(Unit) {
+                permissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.RECORD_AUDIO,
+                        Manifest.permission.CAMERA,
+                        Manifest.permission.CALL_PHONE
+                    )
+                )
+            }
 
             JarvisAiTheme(themeMode = modelsUiState.appTheme) {
                 Surface(
