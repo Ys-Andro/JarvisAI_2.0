@@ -103,23 +103,21 @@ jobs:
         run: |
           set -e
           APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
-          echo "APK path: $APK"
+          echo "APK: $APK"
           ls -lh "$APK"
-          # Debe ser un ZIP válido
           unzip -t "$APK"
-          # Mostrar que no esté truncado
-          python3 - <<'PY'
-          import zipfile, sys, os
-          apk = os.environ.get("APK")
-          print("size:", os.path.getsize(apk))
+          python3 -c "
+          import zipfile, os, sys
+          apk = '''$APK'''
+          print('size:', os.path.getsize(apk))
           with zipfile.ZipFile(apk) as z:
               err = z.testzip()
               if err:
-                  print("CORRUPT entry:", err)
+                  print('CORRUPT:', err)
                   sys.exit(1)
-              print("entries:", len(z.namelist()))
-              print("APK integrity OK")
-          PY
+              print('entries:', len(z.namelist()))
+              print('APK integrity OK')
+          "
 
       # 8. Compile Release APK (Optional)
       - name: Build Release APK
