@@ -98,7 +98,6 @@ jobs:
           echo "Building Debug APK using installed Gradle..."
           gradle :app:assembleDebug --stacktrace --info --no-daemon
 
-      # 7b. Verify Debug APK integrity
       - name: Verify Debug APK integrity
         run: |
           set -e
@@ -107,34 +106,31 @@ jobs:
           ls -lh "$APK"
           unzip -t "$APK"
           python3 -c "
-          import zipfile, os, sys
-          apk = '''$APK'''
-          print('size:', os.path.getsize(apk))
-          with zipfile.ZipFile(apk) as z:
-              err = z.testzip()
-              if err:
-                  print('CORRUPT:', err)
-                  sys.exit(1)
-              print('entries:', len(z.namelist()))
-              print('APK integrity OK')
-          "
+import zipfile, os, sys
+apk = '''$APK'''
+print('size:', os.path.getsize(apk))
+with zipfile.ZipFile(apk) as z:
+    err = z.testzip()
+    if err:
+        print('CORRUPT:', err)
+        sys.exit(1)
+    print('entries:', len(z.namelist()))
+    print('APK integrity OK')
+"
 
-      # 8. Compile Release APK (Optional)
-      - name: Build Release APK
+      - name: Pack Debug APK into tar
         run: |
-          echo "Building Release APK using installed Gradle..."
-          gradle :app:assembleRelease --stacktrace --no-daemon || echo "Release build completed or skipped."
-
-      # 9. Pack and Upload Debug APK Artifact as tar
-      - name: Pack and Upload Debug APK
-        run: |
+          set -e
           mkdir -p dist
           APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
-          cp "$APK" dist/
-          APK_NAME=$(basename "$APK")
-          tar -cf dist/jarvis-debug.tar -C dist "$APK_NAME"
+          cp "$APK" dist/app-debug.apk
+          # tar sin compresión (solo contenedor)
+          tar -cf dist/jarvis-debug.tar -C dist app-debug.apk
+          ls -lh dist/
+          # verificar que el tar se puede listar
+          tar -tf dist/jarvis-debug.tar
 
-      - name: Upload Debug Tar Artifact
+      - name: Upload Debug APK (as tar)
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-ai-debug-arm64
@@ -143,12 +139,30 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      # 10. Upload Release APK Artifact (if generated)
-      - name: Upload Release APK
+      - name: Build Release APK
+        run: |
+          echo "Building Release APK using installed Gradle..."
+          gradle :app:assembleRelease --stacktrace --no-daemon || echo "Release build completed or skipped."
+
+      - name: Pack Release APK into tar (if exists)
+        if: success()
+        run: |
+          set -e
+          if ls app/build/outputs/apk/release/*.apk 1> /dev/null 2>&1; then
+            mkdir -p dist-release
+            APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+            cp "$APK" dist-release/app-release.apk
+            tar -cf dist-release/jarvis-release.tar -C dist-release app-release.apk
+            ls -lh dist-release/
+          else
+            echo "No release APK found, skipping pack."
+          fi
+
+      - name: Upload Release APK (as tar)
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-ai-release-arm64
-          path: app/build/outputs/apk/release/*.apk
+          path: dist-release/jarvis-release.tar
           compression-level: 0
           retention-days: 14
           if-no-files-found: ignore
