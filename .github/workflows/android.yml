@@ -2,11 +2,9 @@ name: Build Jarvis AI (Android)
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -18,18 +16,14 @@ jobs:
     name: Build APKs (arm64-v8a)
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Ensure llama.cpp submodule is present
+      - name: Ensure llama.cpp
         run: |
-          if [ -f "app/src/main/cpp/llama.cpp/CMakeLists.txt" ]; then
-            echo "llama.cpp already present"
-          else
+          if [ ! -f "app/src/main/cpp/llama.cpp/CMakeLists.txt" ]; then
             git submodule update --init --recursive || true
             if [ ! -f "app/src/main/cpp/llama.cpp/CMakeLists.txt" ]; then
               rm -rf app/src/main/cpp/llama.cpp
@@ -37,58 +31,47 @@ jobs:
             fi
           fi
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.3.1'
+          gradle-version: "9.3.1"
 
-      - name: Configure Android SDK, NDK and CMake
+      - name: Configure Android SDK
         run: |
-          if [ -z "$ANDROID_HOME" ]; then
-            export ANDROID_HOME="/usr/local/lib/android/sdk"
-          fi
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
 
-      - name: Ensure debug keystore exists
+      - name: Debug keystore
         run: |
-          if [ ! -f "debug.keystore" ]; then
+          if [ ! -f debug.keystore ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
       - name: Build Debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Verify Debug APK integrity
+      - name: Verify and pack Debug APK
         run: |
           set -e
           APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
-          echo "APK: $APK"
+          echo "APK=$APK"
           ls -lh "$APK"
           unzip -t "$APK"
-          python3 -c "import zipfile,os,sys; apk=r'''$APK'''; print('size',os.path.getsize(apk)); z=zipfile.ZipFile(apk); e=z.testzip();
-print('CORRUPT',e) or sys.exit(1) if e else print('entries',len(z.namelist()),'APK OK')"
-
-      - name: Pack Debug APK into tar
-        run: |
-          set -e
           mkdir -p dist
-          APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
           cp "$APK" dist/app-debug.apk
           tar -cf dist/jarvis-debug.tar -C dist app-debug.apk
-          ls -lh dist/
           tar -tf dist/jarvis-debug.tar
+          ls -lh dist/
 
-      - name: Upload Debug APK (as tar)
+      - name: Upload Debug APK tar
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-ai-debug-arm64
@@ -98,20 +81,18 @@ print('CORRUPT',e) or sys.exit(1) if e else print('entries',len(z.namelist()),'A
           if-no-files-found: error
 
       - name: Build Release APK
-        run: gradle :app:assembleRelease --stacktrace --no-daemon || echo "Release skipped"
+        run: gradle :app:assembleRelease --stacktrace --no-daemon || true
 
-      - name: Pack Release APK into tar
+      - name: Pack Release APK
         run: |
           if ls app/build/outputs/apk/release/*.apk 1>/dev/null 2>&1; then
             mkdir -p dist-release
             APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
             cp "$APK" dist-release/app-release.apk
             tar -cf dist-release/jarvis-release.tar -C dist-release app-release.apk
-          else
-            echo "No release APK"
           fi
 
-      - name: Upload Release APK (as tar)
+      - name: Upload Release APK tar
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-ai-release-arm64
