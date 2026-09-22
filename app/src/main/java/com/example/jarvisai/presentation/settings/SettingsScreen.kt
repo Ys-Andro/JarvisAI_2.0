@@ -620,6 +620,129 @@ fun SettingsScreen(
                             )
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "MOTOR DE TTS",
+                        color = JarvisPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val engines = listOf(
+                        Triple("android", "Android TTS", "Motor integrado del sistema (Offline)"),
+                        Triple("openrouter_flux", "OpenRouter Flux TTS", "Deepgram Flux via OpenRouter (Gratis, Cloud)")
+                    )
+
+                    engines.forEach { (id, name, desc) ->
+                        val isSelected = settings.ttsEngine == id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) JarvisPrimary.copy(alpha = 0.15f) else JarvisSurfaceVariant)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) JarvisPrimary else JarvisBorder,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable { viewModel.updateTtsEngine(id) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = name,
+                                    color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = desc,
+                                    color = JarvisTextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            if (isSelected) {
+                                Text(
+                                    text = "ACTIVO",
+                                    color = JarvisAccentGreen,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+
+                    if (settings.ttsEngine == "openrouter_flux") {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "VOZ DE FLUX (OPENROUTER)",
+                            color = JarvisPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val voices = listOf(
+                            Pair("flux-alexis-en", "Alexis (Inglés)"),
+                            Pair("flux-kore-en", "Kore (Inglés)"),
+                            Pair("flux-alpha-en", "Alpha (Inglés)"),
+                            Pair("flux-beta-en", "Beta (Inglés)")
+                        )
+
+                        voices.forEach { (voiceId, voiceName) ->
+                            val isSelectedVoice = settings.fluxVoice == voiceId
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelectedVoice) JarvisPrimary.copy(alpha = 0.12f) else JarvisSurfaceVariant)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isSelectedVoice) JarvisPrimary else JarvisBorder,
+                                        shape = RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable { viewModel.updateFluxVoice(voiceId) }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = voiceName,
+                                    color = if (isSelectedVoice) JarvisPrimary else JarvisTextPrimary,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                if (isSelectedVoice) {
+                                    Text(
+                                        text = "✓",
+                                        color = JarvisAccentGreen,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        if (uiState.providerApiKeys["openrouter"].isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "⚠️ Falta configurar la API Key de OpenRouter arriba para usar Flux TTS.",
+                                color = Color(0xFFFFB74D),
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
                 }
             }
 

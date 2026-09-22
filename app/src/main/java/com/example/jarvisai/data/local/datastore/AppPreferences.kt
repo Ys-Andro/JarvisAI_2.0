@@ -43,6 +43,8 @@ class AppPreferences(private val context: Context) {
         val AUTO_TTS = booleanPreferencesKey("auto_tts")
         val TTS_SPEED = floatPreferencesKey("tts_speed")
         val TTS_PITCH = floatPreferencesKey("tts_pitch")
+        val TTS_ENGINE = stringPreferencesKey("tts_engine")
+        val FLUX_VOICE = stringPreferencesKey("flux_voice")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
     }
@@ -107,7 +109,9 @@ class AppPreferences(private val context: Context) {
                 ?: "You are Jarvis, an intelligent, helpful, and concise AI assistant running completely offline on the user's device.",
             autoTts = preferences[Keys.AUTO_TTS] ?: false,
             ttsSpeed = preferences[Keys.TTS_SPEED] ?: 1.0f,
-            ttsPitch = preferences[Keys.TTS_PITCH] ?: 1.0f
+            ttsPitch = preferences[Keys.TTS_PITCH] ?: 1.0f,
+            ttsEngine = preferences[Keys.TTS_ENGINE] ?: "android",
+            fluxVoice = preferences[Keys.FLUX_VOICE] ?: "flux-alexis-en"
         )
     }
 
@@ -146,6 +150,8 @@ class AppPreferences(private val context: Context) {
             preferences[Keys.AUTO_TTS] = settings.autoTts
             preferences[Keys.TTS_SPEED] = settings.ttsSpeed
             preferences[Keys.TTS_PITCH] = settings.ttsPitch
+            preferences[Keys.TTS_ENGINE] = settings.ttsEngine
+            preferences[Keys.FLUX_VOICE] = settings.fluxVoice
         }
     }
 

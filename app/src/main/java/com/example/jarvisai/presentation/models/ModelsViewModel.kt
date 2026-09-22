@@ -309,6 +309,16 @@ class ModelsViewModel(
         updateSettings(current.copy(autoTts = enabled))
     }
 
+    fun updateTtsEngine(engine: String) {
+        val current = _uiState.value.settings
+        updateSettings(current.copy(ttsEngine = engine))
+    }
+
+    fun updateFluxVoice(voice: String) {
+        val current = _uiState.value.settings
+        updateSettings(current.copy(fluxVoice = voice))
+    }
+
     fun setAppTheme(theme: AppThemeMode) {
         viewModelScope.launch {
             settingsRepository.setAppTheme(theme)

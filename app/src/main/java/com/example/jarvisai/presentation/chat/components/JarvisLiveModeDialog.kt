@@ -1,10 +1,10 @@
 package com.example.jarvisai.presentation.chat.components
 
-import android.app.Activity
 import android.content.Intent
+import android.os.Bundle
+import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.speech.SpeechRecognizer
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,55 +72,89 @@ fun JarvisLiveModeDialog(
 ) {
     val context = LocalContext.current
     var liveStateText by remember { mutableStateOf("Escuchando... Habla con Jarvis de forma continua.") }
-    var lastSpokenInput by remember { mutableStateOf("") }
     var isListening by remember { mutableStateOf(false) }
     var isJarvisTalking by remember { mutableStateOf(false) }
 
-    var startListening by remember { mutableStateOf<() -> Unit>({}) }
+    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
 
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            if (!spoken.isNullOrBlank()) {
-                lastSpokenInput = spoken
-                liveStateText = "Tú: \"$spoken\""
-                isListening = false
-                isJarvisTalking = true
-
-                onUserSpoken(spoken) { response ->
-                    liveStateText = "Jarvis: $response"
-                    isJarvisTalking = false
-                    // Automatically restart listening after Jarvis finishes speaking or responds
-                    android.os.Handler(context.mainLooper).postDelayed({
-                        startListening()
-                    }, 1500)
+    val startListening: () -> Unit = {
+        if (!isListening && !isJarvisTalking && !isSpeakingTts) {
+            try {
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
                 }
-            } else {
-                // Restart listening if empty
-                startListening()
+                speechRecognizer?.startListening(intent)
+                isListening = true
+                liveStateText = "Escuchando..."
+            } catch (e: Exception) {
+                isListening = false
             }
-        } else {
-            // Restart listening on cancel/error
-            startListening()
         }
     }
 
     LaunchedEffect(Unit) {
-        startListening = {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                putExtra(RecognizerIntent.EXTRA_PROMPT, "Jarvis te escucha...")
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
-            }
+        val recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    isListening = true
+                    liveStateText = "Escuchando..."
+                }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {
+                    isListening = false
+                }
+                override fun onError(error: Int) {
+                    isListening = false
+                    android.os.Handler(context.mainLooper).postDelayed({
+                        startListening()
+                    }, 1000)
+                }
+                override fun onResults(results: Bundle?) {
+                    isListening = false
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val spoken = matches?.firstOrNull()
+                    if (!spoken.isNullOrBlank()) {
+                        liveStateText = "Tú: \"$spoken\""
+                        isJarvisTalking = true
+                        onUserSpoken(spoken) { response ->
+                            liveStateText = "Jarvis: $response"
+                            isJarvisTalking = false
+                            android.os.Handler(context.mainLooper).postDelayed({
+                                startListening()
+                            }, 1500)
+                        }
+                    } else {
+                        android.os.Handler(context.mainLooper).postDelayed({
+                            startListening()
+                        }, 1000)
+                    }
+                }
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val partial = matches?.firstOrNull()
+                    if (!partial.isNullOrBlank()) {
+                        liveStateText = "Escuchando: \"$partial\""
+                    }
+                }
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+        speechRecognizer = recognizer
+        startListening()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
             try {
-                speechLauncher.launch(intent)
+                speechRecognizer?.stopListening()
+                speechRecognizer?.destroy()
             } catch (_: Exception) {}
         }
-        startListening()
     }
 
     // Pulse animation for Live orb
@@ -183,6 +217,10 @@ fun JarvisLiveModeDialog(
 
                 IconButton(
                     onClick = {
+                        try {
+                            speechRecognizer?.stopListening()
+                            speechRecognizer?.destroy()
+                        } catch (_: Exception) {}
                         onStopTts()
                         onDismiss()
                     },
@@ -259,6 +297,9 @@ fun JarvisLiveModeDialog(
                 Surface(
                     onClick = {
                         onStopTts()
+                        try {
+                            speechRecognizer?.stopListening()
+                        } catch (_: Exception) {}
                         startListening()
                     },
                     shape = RoundedCornerShape(20.dp),

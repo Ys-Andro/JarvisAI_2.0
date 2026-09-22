@@ -10,5 +10,7 @@ data class GenerationSettings(
     val systemPrompt: String = "You are Jarvis, an intelligent, helpful, and concise AI assistant running completely offline on the user's device.",
     val autoTts: Boolean = false,
     val ttsSpeed: Float = 1.0f,
-    val ttsPitch: Float = 1.0f
+    val ttsPitch: Float = 1.0f,
+    val ttsEngine: String = "android", // "android" or "openrouter_flux"
+    val fluxVoice: String = "flux-alexis-en"
 )

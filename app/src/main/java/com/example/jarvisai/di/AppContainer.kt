@@ -10,6 +10,7 @@ import com.example.jarvisai.data.local.database.dao.ModelDao
 import com.example.jarvisai.data.local.datastore.AppPreferences
 import com.example.jarvisai.data.api.gemini.GeminiApiClient
 import com.example.jarvisai.data.repository.AndroidTtsRepository
+import com.example.jarvisai.data.repository.HybridTtsRepository
 import com.example.jarvisai.data.repository.ConversationRepositoryImpl
 import com.example.jarvisai.data.repository.DocumentRepositoryImpl
 import com.example.jarvisai.data.repository.GeminiInferenceRepository
@@ -95,6 +96,6 @@ class AppContainer(private val context: Context) {
     }
 
     val ttsRepository: ITtsRepository by lazy {
-        AndroidTtsRepository(context)
+        HybridTtsRepository(context, settingsRepository)
     }
 }
