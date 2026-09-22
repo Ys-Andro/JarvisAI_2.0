@@ -12,6 +12,7 @@ import com.example.jarvisai.domain.model.LocalGgufModel
 import com.example.jarvisai.domain.repository.IInferenceRepository
 import com.example.jarvisai.domain.repository.IModelRepository
 import com.example.jarvisai.domain.repository.ISettingsRepository
+import com.example.jarvisai.domain.repository.ITtsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,7 @@ class ModelsViewModel(
     private val modelRepository: IModelRepository,
     private val inferenceRepository: IInferenceRepository,
     private val settingsRepository: ISettingsRepository,
+    private val ttsRepository: ITtsRepository,
     private val context: Context
 ) : ViewModel() {
 
@@ -415,6 +417,17 @@ class ModelsViewModel(
                     selectedAgentId = agentId,
                     statusMessage = "Agente activo: ${agent.name}"
                 )
+            }
+        }
+    }
+
+    fun testVoice(text: String = "Buenas noches, señor. Sistemas en línea.") {
+        viewModelScope.launch {
+            try {
+                val settings = settingsRepository.getSettings().first()
+                ttsRepository.speak(text, settings.ttsPitch, settings.ttsSpeed)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error testing voice", e)
             }
         }
     }

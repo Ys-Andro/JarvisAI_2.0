@@ -37,6 +37,7 @@ class JarvisViewModelFactory(
                     modelRepository = appContainer.modelRepository,
                     inferenceRepository = appContainer.inferenceRepository,
                     settingsRepository = appContainer.settingsRepository,
+                    ttsRepository = appContainer.ttsRepository,
                     context = context
                 ) as T
             }
