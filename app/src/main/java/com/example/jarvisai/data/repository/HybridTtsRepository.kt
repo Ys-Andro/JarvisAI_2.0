@@ -12,7 +12,7 @@ class HybridTtsRepository(
     private val settingsRepository: ISettingsRepository
 ) : ITtsRepository {
 
-    private val androidTts = AndroidTtsRepository(context)
+    private val androidTts = AndroidTtsRepository(context, settingsRepository)
     private val fluxTts = OpenRouterFluxTtsRepository(context, settingsRepository, androidTts)
 
     override val isSpeaking: Flow<Boolean> = merge(

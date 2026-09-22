@@ -681,25 +681,94 @@ fun SettingsScreen(
                         }
                     }
 
-                    if (settings.ttsEngine == "openrouter_flux") {
+                    if (settings.ttsEngine == "android") {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "VOZ DE FLUX (OPENROUTER)",
+                            text = "VOZ DE ANDROID (ESTILO JARVIS)",
                             color = JarvisPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tono grave y asistente optimizado por defecto (Pitch: 0.9x)",
+                            color = JarvisTextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val androidVoiceOptions = listOf(
+                            Pair("", "Predeterminado (Automático - Masculino / Grave)"),
+                            Pair("en-us-x-sfg#male_1-local", "Inglés US - Masculino 1"),
+                            Pair("en-gb-x-rjs#male_1-local", "Inglés UK - Británico Jarvis"),
+                            Pair("es-es-x-eee#male_1-local", "Español - Masculino Asistente")
+                        )
+
+                        androidVoiceOptions.forEach { (voiceId, voiceName) ->
+                            val isSelectedVoice = settings.androidVoiceName == voiceId
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelectedVoice) JarvisPrimary.copy(alpha = 0.12f) else JarvisSurfaceVariant)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isSelectedVoice) JarvisPrimary else JarvisBorder,
+                                        shape = RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable { viewModel.updateAndroidVoiceName(voiceId) }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = voiceName,
+                                    color = if (isSelectedVoice) JarvisPrimary else JarvisTextPrimary,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                if (isSelectedVoice) {
+                                    Text(
+                                        text = "✓",
+                                        color = JarvisAccentGreen,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (settings.ttsEngine == "openrouter_flux") {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "VOCES MASCULINAS / JARVIS (OPENROUTER FLUX)",
+                            color = JarvisPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Modelo: deepgram/flux-tts:free (Voces graves y de asistente)",
+                            color = JarvisTextSecondary,
+                            fontSize = 11.sp
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
 
                         val voices = listOf(
-                            Pair("flux-alexis-en", "Alexis (Inglés)"),
-                            Pair("flux-kore-en", "Kore (Inglés)"),
-                            Pair("flux-alpha-en", "Alpha (Inglés)"),
-                            Pair("flux-beta-en", "Beta (Inglés)")
+                            Triple("flux-alexis-en", "Alexis", "Masculina / Grave principal"),
+                            Triple("flux-orion-en", "Orion", "Masculina / Profunda estilo Jarvis"),
+                            Triple("flux-apollo-en", "Apollo", "Masculina / Elegante y clara"),
+                            Triple("flux-zeus-en", "Zeus", "Masculina / Solemne y autoritaria"),
+                            Triple("flux-kore-en", "Kore", "Voz de asistente equilibrada"),
+                            Triple("flux-alpha-en", "Alpha", "Voz neutra avanzada"),
+                            Triple("flux-beta-en", "Beta", "Voz alternativa")
                         )
 
-                        voices.forEach { (voiceId, voiceName) ->
+                        voices.forEach { (voiceId, name, desc) ->
                             val isSelectedVoice = settings.fluxVoice == voiceId
                             Row(
                                 modifier = Modifier
@@ -717,12 +786,20 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = voiceName,
-                                    color = if (isSelectedVoice) JarvisPrimary else JarvisTextPrimary,
-                                    fontSize = 12.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = name,
+                                        color = if (isSelectedVoice) JarvisPrimary else JarvisTextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = desc,
+                                        color = JarvisTextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
                                 if (isSelectedVoice) {
                                     Text(
                                         text = "✓",

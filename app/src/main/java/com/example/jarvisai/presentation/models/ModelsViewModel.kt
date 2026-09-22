@@ -319,6 +319,11 @@ class ModelsViewModel(
         updateSettings(current.copy(fluxVoice = voice))
     }
 
+    fun updateAndroidVoiceName(voiceName: String) {
+        val current = _uiState.value.settings
+        updateSettings(current.copy(androidVoiceName = voiceName))
+    }
+
     fun setAppTheme(theme: AppThemeMode) {
         viewModelScope.launch {
             settingsRepository.setAppTheme(theme)

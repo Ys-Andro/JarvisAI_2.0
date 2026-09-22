@@ -4,18 +4,17 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import com.example.jarvisai.domain.repository.ISettingsRepository
 import com.example.jarvisai.domain.repository.ITtsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import java.util.Locale
 
-/**
- * Concrete implementation of ITtsRepository using Android's built-in TextToSpeech engine.
- * Fully offline if device has offline TTS voice data installed.
- */
 class AndroidTtsRepository(
-    private val context: Context
+    private val context: Context,
+    private val settingsRepository: ISettingsRepository
 ) : ITtsRepository, TextToSpeech.OnInitListener {
 
     companion object {
@@ -70,9 +69,35 @@ class AndroidTtsRepository(
             Log.w(TAG, "Cannot speak: TTS not initialized")
             return
         }
-        val cleanText = text.replace(Regex("<[^>]*>"), "") // Strip tags if any
-        tts?.setPitch(pitch)
+        val settings = settingsRepository.getSettings().first()
+        val cleanText = text.replace(Regex("<[^>]*>"), "")
+
+        // Apply deeper Jarvis pitch by default (0.9f) or user setting
+        val effectivePitch = if (pitch == 1.0f) settings.ttsPitch else pitch
+        tts?.setPitch(effectivePitch)
         tts?.setSpeechRate(speed)
+
+        try {
+            if (settings.androidVoiceName.isNotBlank()) {
+                tts?.voices?.find { it.name == settings.androidVoiceName }?.let { voice ->
+                    tts?.voice = voice
+                }
+            } else {
+                val bestVoice = tts?.voices?.firstOrNull {
+                    it.name.contains("male", ignoreCase = true) &&
+                    (it.locale.language == "en" || it.locale.language == "es")
+                } ?: tts?.voices?.firstOrNull {
+                    it.locale.language == "en" || it.locale.language == "es"
+                } ?: tts?.voices?.firstOrNull()
+
+                if (bestVoice != null) {
+                    tts?.voice = bestVoice
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error setting Android voice: ${e.message}")
+        }
+
         _isSpeaking.value = true
         tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
     }
