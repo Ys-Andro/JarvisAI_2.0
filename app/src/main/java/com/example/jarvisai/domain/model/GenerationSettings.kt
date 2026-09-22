@@ -12,6 +12,6 @@ data class GenerationSettings(
     val ttsSpeed: Float = 1.0f,
     val ttsPitch: Float = 0.85f, // Deep masculine Jarvis pitch by default
     val ttsEngine: String = "android", // "android" or "openrouter_flux"
-    val fluxVoice: String = "flux-orion-en", // Default to deep Orion masculine voice
+    val fluxVoice: String = "flux-cliff-en", // Default to Cliff (Hombre grave) — estilo Jarvis
     val androidVoiceName: String = ""
 )

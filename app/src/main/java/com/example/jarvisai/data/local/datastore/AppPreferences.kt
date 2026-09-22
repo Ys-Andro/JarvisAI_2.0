@@ -112,7 +112,7 @@ class AppPreferences(private val context: Context) {
             ttsSpeed = preferences[Keys.TTS_SPEED] ?: 1.0f,
             ttsPitch = preferences[Keys.TTS_PITCH] ?: 1.0f,
             ttsEngine = preferences[Keys.TTS_ENGINE] ?: "android",
-            fluxVoice = preferences[Keys.FLUX_VOICE] ?: "flux-alexis-en",
+            fluxVoice = preferences[Keys.FLUX_VOICE] ?: "flux-cliff-en",
             androidVoiceName = preferences[Keys.ANDROID_VOICE_NAME] ?: ""
         )
     }

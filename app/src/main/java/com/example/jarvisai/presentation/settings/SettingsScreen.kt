@@ -760,13 +760,12 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         val voices = listOf(
-                            Triple("flux-alexis-en", "Alexis", "Masculina / Grave principal"),
-                            Triple("flux-orion-en", "Orion", "Masculina / Profunda estilo Jarvis"),
-                            Triple("flux-apollo-en", "Apollo", "Masculina / Elegante y clara"),
-                            Triple("flux-zeus-en", "Zeus", "Masculina / Solemne y autoritaria"),
-                            Triple("flux-kore-en", "Kore", "Voz de asistente equilibrada"),
-                            Triple("flux-alpha-en", "Alpha", "Voz neutra avanzada"),
-                            Triple("flux-beta-en", "Beta", "Voz alternativa")
+                            Triple("flux-cliff-en", "Cliff (Hombre grave)", "Estilo Jarvis — Grave y autoritaria"),
+                            Triple("flux-conor-en", "Conor (Hombre británico grave)", "Tono británico formal y profundo"),
+                            Triple("flux-jack-en", "Jack (Hombre británico profesional)", "Voz corporativa seria"),
+                            Triple("flux-kit-en", "Kit (Hombre británico claro)", "Tono claro y articulado"),
+                            Triple("flux-donovan-en", "Donovan (Hombre calmado)", "Tono pausado y sereno"),
+                            Triple("flux-bruce-en", "Bruce (Hombre natural)", "Tono natural conversacional")
                         )
 
                         voices.forEach { (voiceId, name, desc) ->

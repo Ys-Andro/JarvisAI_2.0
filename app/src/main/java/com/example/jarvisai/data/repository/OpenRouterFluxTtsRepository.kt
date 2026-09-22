@@ -58,10 +58,13 @@ class OpenRouterFluxTtsRepository(
                 conn.connectTimeout = 15000
                 conn.readTimeout = 20000
 
+                val voiceId = settings.fluxVoice.ifBlank { "flux-cliff-en" }
+                Log.d("TTS", "Speaking with voiceId=$voiceId")
+
                 val jsonBody = JSONObject().apply {
                     put("model", "deepgram/flux-tts:free")
                     put("input", cleanText)
-                    put("voice", settings.fluxVoice.ifBlank { "flux-alexis-en" })
+                    put("voice", voiceId)
                     put("response_format", "mp3")
                 }
 

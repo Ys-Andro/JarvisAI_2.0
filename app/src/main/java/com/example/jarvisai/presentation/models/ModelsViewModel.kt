@@ -421,7 +421,7 @@ class ModelsViewModel(
         }
     }
 
-    fun testVoice(text: String = "Buenas noches, señor. Sistemas en línea.") {
+    fun testVoice(text: String = "Good evening, sir. All systems are online.") {
         viewModelScope.launch {
             try {
                 val settings = settingsRepository.getSettings().first()
