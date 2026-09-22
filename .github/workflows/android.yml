@@ -58,18 +58,23 @@ jobs:
       - name: Build Debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Verify and pack Debug APK
+      - name: Verify and pack installable APK
         run: |
           set -e
           APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
           echo "APK=$APK"
           ls -lh "$APK"
           unzip -t "$APK"
+          unzip -l "$APK" | grep -E "AndroidManifest.xml|classes.dex" || (echo "APK incompleto o sin manifiesto/dex" && exit 1)
           mkdir -p dist
           cp "$APK" dist/app-debug.apk
           tar -cf dist/jarvis-debug.tar -C dist app-debug.apk
           tar -tf dist/jarvis-debug.tar
-          ls -lh dist/
+          # re-extraer y volver a testear
+          mkdir -p /tmp/apkcheck
+          tar -xf dist/jarvis-debug.tar -C /tmp/apkcheck
+          unzip -t /tmp/apkcheck/app-debug.apk
+          echo "APK listo para instalar"
 
       - name: Upload Debug APK tar
         uses: actions/upload-artifact@v4
