@@ -110,6 +110,7 @@ jobs:
         with:
           name: jarvis-ai-debug-arm64
           path: app/build/outputs/apk/debug/*.apk
+          compression-level: 0
           retention-days: 14
           if-no-files-found: error
 
@@ -119,5 +120,6 @@ jobs:
         with:
           name: jarvis-ai-release-arm64
           path: app/build/outputs/apk/release/*.apk
+          compression-level: 0
           retention-days: 14
           if-no-files-found: ignore
