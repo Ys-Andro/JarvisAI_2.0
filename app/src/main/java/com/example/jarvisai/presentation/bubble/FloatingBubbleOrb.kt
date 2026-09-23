@@ -17,17 +17,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,19 +52,24 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
 import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBackground
 import com.example.jarvisai.ui.theme.JarvisBorder
-import com.example.jarvisai.ui.theme.JarvisBorderGlow
 import com.example.jarvisai.ui.theme.JarvisPrimary
 import com.example.jarvisai.ui.theme.JarvisSurface
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * High-fidelity Jarvis Floating Orb overlay supporting:
+ * - IDLE: Ambient breathing pulse with slow-rotating arc-reactor reticle.
+ * - LISTENING: Concentric radar sonar ripples and pulsating microphone icon.
+ * - THINKING: Dual high-speed counter-rotating orbital cybernetic rings.
+ * - SPEAKING: Reactive voice synthesizer frequency equalizer bars inside core.
+ */
 @Composable
 fun FloatingBubbleOrb(
     visualState: JarvisVisualState,
@@ -74,54 +84,94 @@ fun FloatingBubbleOrb(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "orbAnimations")
 
-    // Slow ambient breathing pulse for idle
+    // Ambient breathing pulse for IDLE state
     val idlePulse by infiniteTransition.animateFloat(
         initialValue = 0.94f,
         targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2400, easing = FastOutSlowInEasing),
+            animation = tween(2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "idlePulse"
     )
 
-    // Fast rotation for thinking state
-    val thinkingRotation by infiniteTransition.animateFloat(
+    // Slow ambient reticle rotation for IDLE
+    val idleReticleRotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
+            animation = tween(12000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "thinkingRotation"
+        label = "idleReticleRotation"
     )
 
-    // Concentric ripple waves for listening state
-    val rippleScale1 by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.6f,
+    // Fast rotation for THINKING state (outer ring, clockwise)
+    val thinkingOuterRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(1600, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "ripple1"
+        label = "thinkingOuterRotation"
     )
-    val rippleAlpha1 by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
+
+    // Counter-rotation for THINKING state (inner ring, counter-clockwise)
+    val thinkingInnerRotation by infiniteTransition.animateFloat(
+        initialValue = 360f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(2200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "rippleAlpha1"
+        label = "thinkingInnerRotation"
     )
 
-    // Pulsing waveform for speaking state
-    val speakingPulse by infiniteTransition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.15f,
+    // Concentric ripple waves for LISTENING state
+    val listeningRippleScale1 by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.75f,
         animationSpec = infiniteRepeatable(
-            animation = tween(400, easing = FastOutSlowInEasing),
+            animation = tween(1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "listeningRipple1"
+    )
+    val listeningRippleAlpha1 by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "listeningRippleAlpha1"
+    )
+    val listeningRippleScale2 by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, delayMillis = 400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "listeningRipple2"
+    )
+    val listeningRippleAlpha2 by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, delayMillis = 400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "listeningRippleAlpha2"
+    )
+
+    // Sonic shockwave pulse for SPEAKING state
+    val speakingPulse by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(380, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "speakingPulse"
@@ -138,7 +188,9 @@ fun FloatingBubbleOrb(
     val primaryColor = when (visualState) {
         JarvisVisualState.ERROR -> JarvisAccentRed
         JarvisVisualState.LISTENING -> JarvisAccentGreen
-        else -> JarvisPrimary
+        JarvisVisualState.SPEAKING -> Color(0xFF40C4FF)
+        JarvisVisualState.THINKING -> JarvisPrimary
+        JarvisVisualState.IDLE -> JarvisPrimary
     }
 
     Box(
@@ -146,7 +198,7 @@ fun FloatingBubbleOrb(
             .size(if (isHaloExpanded) 200.dp else 90.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Halo Backdrop Tap to Dismiss Halo
+        // Backdrop dismissal for halo
         if (isHaloExpanded) {
             Box(
                 modifier = Modifier
@@ -155,46 +207,119 @@ fun FloatingBubbleOrb(
             )
         }
 
-        // Concentric ripples when LISTENING
-        if (visualState == JarvisVisualState.LISTENING) {
-            Box(
-                modifier = Modifier
-                    .size(62.dp)
-                    .scale(rippleScale1)
-                    .clip(CircleShape)
-                    .border(
-                        width = 1.5.dp,
-                        color = primaryColor.copy(alpha = rippleAlpha1),
-                        shape = CircleShape
-                    )
-            )
-        }
-
-        // Rotating Energy Ring when THINKING
-        if (visualState == JarvisVisualState.THINKING) {
+        // ==========================================
+        // 1. VISUAL STATE: IDLE Standby Reticle
+        // ==========================================
+        if (visualState == JarvisVisualState.IDLE) {
             Canvas(
                 modifier = Modifier
                     .size(76.dp)
-                    .rotate(thinkingRotation)
+                    .rotate(idleReticleRotation)
             ) {
                 val stroke = Stroke(
-                    width = 2.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(18f, 18f), 0f)
+                    width = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 24f), 0f)
                 )
                 drawCircle(
-                    color = JarvisPrimary,
+                    color = primaryColor.copy(alpha = 0.35f),
                     style = stroke
                 )
             }
         }
 
-        // Main Orb Container
+        // ==========================================
+        // 2. VISUAL STATE: LISTENING Concentric Sonar Waves
+        // ==========================================
+        if (visualState == JarvisVisualState.LISTENING) {
+            // Ripple 1
+            Box(
+                modifier = Modifier
+                    .size(62.dp)
+                    .scale(listeningRippleScale1)
+                    .clip(CircleShape)
+                    .border(
+                        width = 2.dp,
+                        color = primaryColor.copy(alpha = listeningRippleAlpha1),
+                        shape = CircleShape
+                    )
+            )
+            // Ripple 2
+            Box(
+                modifier = Modifier
+                    .size(62.dp)
+                    .scale(listeningRippleScale2)
+                    .clip(CircleShape)
+                    .border(
+                        width = 1.5.dp,
+                        color = primaryColor.copy(alpha = listeningRippleAlpha2),
+                        shape = CircleShape
+                    )
+            )
+        }
+
+        // ==========================================
+        // 3. VISUAL STATE: THINKING Cybernetic Vortex Rings
+        // ==========================================
+        if (visualState == JarvisVisualState.THINKING) {
+            // Outer clockwise dashed ring
+            Canvas(
+                modifier = Modifier
+                    .size(78.dp)
+                    .rotate(thinkingOuterRotation)
+            ) {
+                val outerStroke = Stroke(
+                    width = 2.5.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 12f), 0f)
+                )
+                drawCircle(
+                    color = JarvisPrimary,
+                    style = outerStroke
+                )
+            }
+
+            // Inner counter-clockwise segmented ring
+            Canvas(
+                modifier = Modifier
+                    .size(68.dp)
+                    .rotate(thinkingInnerRotation)
+            ) {
+                val innerStroke = Stroke(
+                    width = 1.5.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 16f), 0f)
+                )
+                drawCircle(
+                    color = Color(0xFF80D8FF).copy(alpha = 0.8f),
+                    style = innerStroke
+                )
+            }
+        }
+
+        // ==========================================
+        // 4. VISUAL STATE: SPEAKING Shockwave Aura
+        // ==========================================
+        if (visualState == JarvisVisualState.SPEAKING) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .scale(speakingPulse)
+                    .clip(CircleShape)
+                    .border(
+                        width = 2.dp,
+                        color = primaryColor.copy(alpha = 0.45f),
+                        shape = CircleShape
+                    )
+            )
+        }
+
+        // ==========================================
+        // Central Arc Reactor Orb Container
+        // ==========================================
         Box(
             modifier = Modifier
                 .size(62.dp)
                 .scale(currentScale)
                 .shadow(
-                    elevation = 12.dp,
+                    elevation = if (visualState == JarvisVisualState.LISTENING || visualState == JarvisVisualState.SPEAKING) 16.dp else 10.dp,
                     shape = CircleShape,
                     spotColor = primaryColor,
                     ambientColor = primaryColor
@@ -205,7 +330,7 @@ fun FloatingBubbleOrb(
                         colors = listOf(
                             JarvisSurface,
                             JarvisBackground,
-                            Color.Black
+                            Color(0xFF00080D)
                         )
                     )
                 )
@@ -214,9 +339,9 @@ fun FloatingBubbleOrb(
                     brush = Brush.sweepGradient(
                         listOf(
                             primaryColor,
-                            primaryColor.copy(alpha = 0.3f),
+                            primaryColor.copy(alpha = 0.35f),
                             primaryColor,
-                            primaryColor.copy(alpha = 0.1f),
+                            primaryColor.copy(alpha = 0.15f),
                             primaryColor
                         )
                     ),
@@ -233,30 +358,47 @@ fun FloatingBubbleOrb(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Inner Core Arc Reactor Ring
+            // Inner Core
             Box(
                 modifier = Modifier
                     .size(46.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF001B24))
+                    .background(Color(0xFF00141C))
                     .border(
-                        width = 1.dp,
-                        color = primaryColor.copy(alpha = 0.6f),
+                        width = 1.2.dp,
+                        color = primaryColor.copy(alpha = 0.65f),
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                // Futuristic central "J" Core Symbol
-                Text(
-                    text = "J",
-                    color = primaryColor,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
+                when (visualState) {
+                    JarvisVisualState.SPEAKING -> {
+                        // Oscillating voice synthesizer equalizer bars
+                        VoiceEqualizerBars(color = primaryColor)
+                    }
+                    JarvisVisualState.LISTENING -> {
+                        // Pulsing microphone icon
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Escuchando",
+                            tint = primaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    else -> {
+                        // Futuristic central "J" Core Symbol
+                        Text(
+                            text = "J",
+                            color = primaryColor,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
 
-                // Error micro-dot
+                // Error indicator
                 if (visualState == JarvisVisualState.ERROR) {
                     Box(
                         modifier = Modifier
@@ -270,18 +412,20 @@ fun FloatingBubbleOrb(
             }
         }
 
-        // Radial Halo Buttons when Long-Pressed
+        // ==========================================
+        // Satellite Halo Quick Action Buttons
+        // ==========================================
         AnimatedVisibility(
             visible = isHaloExpanded,
-            enter = scaleIn(tween(220)) + fadeIn(tween(180)),
-            exit = scaleOut(tween(180)) + fadeOut(tween(150))
+            enter = scaleIn(tween(200)) + fadeIn(tween(160)),
+            exit = scaleOut(tween(160)) + fadeOut(tween(130))
         ) {
             Box(modifier = Modifier.matchParentSize()) {
                 val radius = 68.dp
                 val actions = listOf(
-                    Triple(0, FloatingBubbleAction.OPEN_MINI_CHAT, Icons.Default.Chat to "Chat"),
+                    Triple(0, FloatingBubbleAction.OPEN_MINI_CHAT, Icons.AutoMirrored.Filled.Chat to "Chat"),
                     Triple(90, FloatingBubbleAction.OPEN_LIVE_MODE, Icons.Default.Mic to "Live"),
-                    Triple(180, FloatingBubbleAction.TOGGLE_MUTE, (if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp) to "Voz"),
+                    Triple(180, FloatingBubbleAction.TOGGLE_MUTE, (if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp) to "Voz"),
                     Triple(270, FloatingBubbleAction.CLOSE_BUBBLE, Icons.Default.Close to "Cerrar")
                 )
 
@@ -294,15 +438,62 @@ fun FloatingBubbleOrb(
                         icon = iconDesc.first,
                         description = iconDesc.second,
                         isDestructive = action == FloatingBubbleAction.CLOSE_BUBBLE,
-                        onClick = {
-                            onActionClick(action)
-                        },
+                        onClick = { onActionClick(action) },
                         modifier = Modifier
                             .align(Alignment.Center)
                             .offset(x = xOffset, y = yOffset)
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Animated voice synthesizer frequency equalizer bars for the SPEAKING state.
+ */
+@Composable
+private fun VoiceEqualizerBars(color: Color) {
+    val infiniteTransition = rememberInfiniteTransition(label = "eqBars")
+    val h1 by infiniteTransition.animateFloat(
+        initialValue = 6f, targetValue = 22f,
+        animationSpec = infiniteRepeatable(tween(280, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "h1"
+    )
+    val h2 by infiniteTransition.animateFloat(
+        initialValue = 18f, targetValue = 8f,
+        animationSpec = infiniteRepeatable(tween(230, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "h2"
+    )
+    val h3 by infiniteTransition.animateFloat(
+        initialValue = 10f, targetValue = 26f,
+        animationSpec = infiniteRepeatable(tween(340, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "h3"
+    )
+    val h4 by infiniteTransition.animateFloat(
+        initialValue = 20f, targetValue = 9f,
+        animationSpec = infiniteRepeatable(tween(260, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "h4"
+    )
+    val h5 by infiniteTransition.animateFloat(
+        initialValue = 8f, targetValue = 17f,
+        animationSpec = infiniteRepeatable(tween(310, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "h5"
+    )
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.padding(horizontal = 4.dp)
+    ) {
+        listOf(h1, h2, h3, h4, h5).forEach { h ->
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(h.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(color)
+            )
         }
     }
 }
@@ -318,22 +509,21 @@ private fun SatelliteButton(
     Surface(
         modifier = modifier
             .size(38.dp)
-            .shadow(6.dp, CircleShape)
+            .shadow(10.dp, CircleShape)
             .clip(CircleShape)
-            .border(
-                width = 1.2.dp,
-                color = if (isDestructive) JarvisAccentRed else JarvisPrimary,
-                shape = CircleShape
-            )
             .clickable { onClick() },
-        color = JarvisSurface,
-        shape = CircleShape
+        color = if (isDestructive) JarvisAccentRed.copy(alpha = 0.9f) else JarvisSurface,
+        shape = CircleShape,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isDestructive) JarvisAccentRed else JarvisPrimary
+        )
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = description,
-                tint = if (isDestructive) JarvisAccentRed else JarvisPrimary,
+                tint = if (isDestructive) Color.White else JarvisPrimary,
                 modifier = Modifier.size(18.dp)
             )
         }

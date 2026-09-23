@@ -3,6 +3,7 @@ package com.example.jarvisai.data.repository
 import com.example.jarvisai.data.local.database.dao.ModelDao
 import com.example.jarvisai.data.mapper.toDomain
 import com.example.jarvisai.data.mapper.toEntity
+import com.example.jarvisai.domain.model.GgufModelState
 import com.example.jarvisai.domain.model.LocalGgufModel
 import com.example.jarvisai.domain.repository.IModelRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -35,7 +36,11 @@ class ModelRepositoryImpl(
         fileName: String,
         filePath: String,
         sizeBytes: Long,
-        quantization: String
+        quantization: String,
+        architecture: String,
+        contextLength: Int,
+        sourceUri: String?,
+        isCachedFromDrive: Boolean
     ): LocalGgufModel = withContext(dispatcher) {
         val model = LocalGgufModel(
             id = UUID.randomUUID().toString(),
@@ -43,14 +48,22 @@ class ModelRepositoryImpl(
             fileName = fileName,
             filePath = filePath,
             sizeBytes = sizeBytes,
+            architecture = architecture,
             quantization = quantization,
-            contextLength = 2048,
+            contextLength = contextLength,
+            state = GgufModelState.REGISTERED,
             isLoaded = false,
             isDefault = false,
-            lastUsedAt = System.currentTimeMillis()
+            lastUsedAt = System.currentTimeMillis(),
+            sourceUri = sourceUri,
+            isCachedFromDrive = isCachedFromDrive
         )
         modelDao.insertModel(model.toEntity())
         model
+    }
+
+    override suspend fun updateModelState(modelId: String, state: GgufModelState) = withContext(dispatcher) {
+        modelDao.updateModelState(modelId, state.name)
     }
 
     override suspend fun deleteModel(modelId: String) = withContext(dispatcher) {

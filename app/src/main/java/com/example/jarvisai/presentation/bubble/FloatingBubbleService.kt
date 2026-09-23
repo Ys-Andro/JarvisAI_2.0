@@ -8,15 +8,18 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
@@ -35,7 +38,6 @@ import com.example.MainActivity
 import com.example.JarvisApplication
 import com.example.jarvisai.di.AppContainer
 import com.example.jarvisai.domain.model.GenerationSettings
-import com.example.jarvisai.domain.model.Role
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,12 +47,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.hypot
 
+/**
+ * Foreground Service managing the Jarvis Floating Bubble Overlay via WindowManager.
+ * Uses SYSTEM_ALERT_WINDOW permission and TYPE_APPLICATION_OVERLAY window type.
+ *
+ * Distinct visual states supported:
+ * - IDLE: Standby breathing pulse with subtle arc-reactor reticle.
+ * - LISTENING: Concentric radar ripples and live speech capture.
+ * - THINKING: Dual high-speed rotating cybernetic energy rings during inference.
+ * - SPEAKING: Reactive voice synthesizer frequency equalizer bars during TTS playback.
+ */
 class FloatingBubbleService : Service() {
 
     companion object {
+        const val TAG = "FloatingBubbleService"
         const val ACTION_START = "ACTION_START_BUBBLE"
         const val ACTION_STOP = "ACTION_STOP_BUBBLE"
+        const val ACTION_SET_STATE = "ACTION_SET_VISUAL_STATE"
+        const val EXTRA_VISUAL_STATE = "EXTRA_VISUAL_STATE"
+
         private const val NOTIFICATION_ID = 9110
         private const val CHANNEL_ID = "jarvis_floating_bubble_channel"
     }
@@ -61,10 +78,12 @@ class FloatingBubbleService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var lifecycleOwner: OverlayLifecycleOwner
 
+    // Overlay Views
     private var bubbleComposeView: ComposeView? = null
     private var miniChatComposeView: ComposeView? = null
     private var dismissTargetComposeView: ComposeView? = null
 
+    // WindowManager Layout Params
     private lateinit var bubbleParams: WindowManager.LayoutParams
     private lateinit var miniChatParams: WindowManager.LayoutParams
     private lateinit var dismissTargetParams: WindowManager.LayoutParams
@@ -73,7 +92,7 @@ class FloatingBubbleService : Service() {
         (application as? JarvisApplication)?.appContainer ?: AppContainer(applicationContext)
     }
 
-    // State
+    // Interactive & Visual States
     private var visualState by mutableStateOf(JarvisVisualState.IDLE)
     private var isMuted by mutableStateOf(false)
     private var isHaloExpanded by mutableStateOf(false)
@@ -81,17 +100,32 @@ class FloatingBubbleService : Service() {
     private var isDraggingBubble by mutableStateOf(false)
     private var isOverDismissTarget by mutableStateOf(false)
 
-    // Chat State
+    // Chat State for Floating Mini Card
     private val miniChatMessages = mutableStateListOf<MiniChatMessage>()
     private var miniChatInputText by mutableStateOf("")
 
+    // Speech Recognizer for voice input directly from bubble
     private var speechRecognizer: SpeechRecognizer? = null
+
+    // Screen Dimensions
+    private var screenWidth = 0
+    private var screenHeight = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+
+        // 1. Mandatory permission check for SYSTEM_ALERT_WINDOW
+        if (!Settings.canDrawOverlays(this)) {
+            Log.e(TAG, "SYSTEM_ALERT_WINDOW permission is not granted. Cannot start overlay.")
+            FloatingBubbleManager.setServiceActive(false)
+            stopSelf()
+            return
+        }
+
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        updateScreenDimensions()
 
         lifecycleOwner = OverlayLifecycleOwner().apply {
             onCreate()
@@ -102,16 +136,72 @@ class FloatingBubbleService : Service() {
         startForegroundNotification()
         FloatingBubbleManager.setServiceActive(true)
 
+        // Observe global visual state changes to synchronize with bubble
+        serviceScope.launch {
+            FloatingBubbleManager.visualState.collect { newState ->
+                visualState = newState
+            }
+        }
+
         initSpeechRecognizer()
         setupViews()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
+        if (!Settings.canDrawOverlays(this)) {
+            Log.e(TAG, "SYSTEM_ALERT_WINDOW permission missing in onStartCommand. Stopping service.")
+            FloatingBubbleManager.setServiceActive(false)
             stopSelf()
             return START_NOT_STICKY
         }
+
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_SET_STATE -> {
+                val stateName = intent.getStringExtra(EXTRA_VISUAL_STATE)
+                stateName?.let {
+                    try {
+                        val state = JarvisVisualState.valueOf(it)
+                        updateVisualState(state)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
         return START_STICKY
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateScreenDimensions()
+        clampBubblePosition()
+    }
+
+    private fun updateScreenDimensions() {
+        val displayMetrics = resources.displayMetrics
+        screenWidth = displayMetrics.widthPixels
+        screenHeight = displayMetrics.heightPixels
+    }
+
+    private fun clampBubblePosition() {
+        if (!::bubbleParams.isInitialized) return
+        val margin = (12 * resources.displayMetrics.density).toInt()
+        bubbleParams.x = bubbleParams.x.coerceIn(margin, (screenWidth - bubbleParams.width - margin).coerceAtLeast(margin))
+        bubbleParams.y = bubbleParams.y.coerceIn(margin, (screenHeight - bubbleParams.height - margin).coerceAtLeast(margin))
+        try {
+            if (bubbleComposeView?.isAttachedToWindow == true) {
+                windowManager.updateViewLayout(bubbleComposeView, bubbleParams)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error updating bubble layout on config change", e)
+        }
+    }
+
+    private fun updateVisualState(state: JarvisVisualState) {
+        visualState = state
+        FloatingBubbleManager.setVisualState(state)
     }
 
     private fun startForegroundNotification() {
@@ -121,7 +211,7 @@ class FloatingBubbleService : Service() {
                 "Jarvis Asistente Flotante",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Servicio en primer plano para la burbuja flotante de Jarvis"
+                description = "Servicio en primer plano para la burbuja flotante y mini chat de Jarvis"
                 setShowBadge(false)
             }
             val notificationManager = getSystemService(NotificationManager::class.java)
@@ -150,7 +240,7 @@ class FloatingBubbleService : Service() {
 
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("JARVIS AI • Activo")
-            .setContentText("Asistente flotante listo. Toca para abrir.")
+            .setContentText("Burbuja flotante lista. Toca para abrir la aplicación.")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(openAppPendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Detener", stopPendingIntent)
@@ -158,14 +248,24 @@ class FloatingBubbleService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting foreground service", e)
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupViews() {
         val displayMetrics = resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -184,7 +284,7 @@ class FloatingBubbleService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 24
+            x = (16 * displayMetrics.density).toInt()
             y = screenHeight / 3
         }
 
@@ -265,19 +365,22 @@ class FloatingBubbleService : Service() {
                         bubbleParams.x = initialX + deltaX
                         bubbleParams.y = initialY + deltaY
                         try {
-                            windowManager.updateViewLayout(bubbleComposeView, bubbleParams)
+                            if (bubbleComposeView?.isAttachedToWindow == true) {
+                                windowManager.updateViewLayout(bubbleComposeView, bubbleParams)
+                            }
                         } catch (_: Exception) {}
 
+                        // Calculate proximity to bottom dismiss target
                         val targetCenterX = screenWidth / 2
-                        val targetCenterY = screenHeight - (100 * displayMetrics.density).toInt()
+                        val targetCenterY = screenHeight - (90 * displayMetrics.density).toInt()
                         val currentCenterX = bubbleParams.x + (bubbleParams.width / 2)
                         val currentCenterY = bubbleParams.y + (bubbleParams.height / 2)
 
-                        val distance = kotlin.math.hypot(
+                        val distance = hypot(
                             (currentCenterX - targetCenterX).toDouble(),
                             (currentCenterY - targetCenterY).toDouble()
                         )
-                        isOverDismissTarget = distance < (85 * displayMetrics.density)
+                        isOverDismissTarget = distance < (95 * displayMetrics.density)
                     }
                     true
                 }
@@ -285,11 +388,13 @@ class FloatingBubbleService : Service() {
                     if (isMovementSignificant) {
                         isDraggingBubble = false
 
+                        // Dropped on dismiss target
                         if (isOverDismissTarget) {
                             stopSelf()
                             return@setOnTouchListener true
                         }
 
+                        // Snap to nearest screen edge (left or right)
                         val currentX = bubbleParams.x
                         val margin = (12 * displayMetrics.density).toInt()
                         val targetX = if (currentX + (bubbleParams.width / 2) < screenWidth / 2) {
@@ -299,8 +404,15 @@ class FloatingBubbleService : Service() {
                         }
 
                         bubbleParams.x = targetX
+                        // Keep Y inside screen boundaries
+                        val minY = margin
+                        val maxY = screenHeight - bubbleParams.height - (margin * 3)
+                        bubbleParams.y = bubbleParams.y.coerceIn(minY, maxY)
+
                         try {
-                            windowManager.updateViewLayout(bubbleComposeView, bubbleParams)
+                            if (bubbleComposeView?.isAttachedToWindow == true) {
+                                windowManager.updateViewLayout(bubbleComposeView, bubbleParams)
+                            }
                         } catch (_: Exception) {}
                     }
                     true
@@ -312,10 +424,10 @@ class FloatingBubbleService : Service() {
         try {
             windowManager.addView(bubbleComposeView, bubbleParams)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error adding bubble view to windowManager", e)
         }
 
-        // Dismiss Target View (Bottom center)
+        // Setup Dismiss Target View (bottom center)
         val dismissTargetSize = (110 * displayMetrics.density).toInt()
         dismissTargetParams = WindowManager.LayoutParams(
             dismissTargetSize,
@@ -344,11 +456,11 @@ class FloatingBubbleService : Service() {
         try {
             windowManager.addView(dismissTargetComposeView, dismissTargetParams)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error adding dismiss target view", e)
         }
 
-        // Mini Chat Card View
-        val cardWidth = (340 * displayMetrics.density).toInt().coerceAtMost(screenWidth - 40)
+        // Setup Mini Chat Card View
+        val cardWidth = (340 * displayMetrics.density).toInt().coerceAtMost(screenWidth - 32)
         val cardHeight = (440 * displayMetrics.density).toInt().coerceAtMost(screenHeight - 80)
 
         miniChatParams = WindowManager.LayoutParams(
@@ -406,8 +518,12 @@ class FloatingBubbleService : Service() {
         bubbleParams.y = (bubbleParams.y - diff).coerceAtLeast(0)
 
         try {
-            windowManager.updateViewLayout(bubbleComposeView, bubbleParams)
-        } catch (_: Exception) {}
+            if (bubbleComposeView?.isAttachedToWindow == true) {
+                windowManager.updateViewLayout(bubbleComposeView, bubbleParams)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error resizing bubble window", e)
+        }
     }
 
     private fun toggleHalo() {
@@ -444,8 +560,12 @@ class FloatingBubbleService : Service() {
         if (!isMiniChatVisible) {
             isMiniChatVisible = true
             try {
-                windowManager.addView(miniChatComposeView, miniChatParams)
-            } catch (_: Exception) {}
+                if (miniChatComposeView?.isAttachedToWindow != true) {
+                    windowManager.addView(miniChatComposeView, miniChatParams)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error adding mini chat view", e)
+            }
         }
     }
 
@@ -454,8 +574,12 @@ class FloatingBubbleService : Service() {
             isMiniChatVisible = false
             stopVoiceDictation()
             try {
-                windowManager.removeView(miniChatComposeView)
-            } catch (_: Exception) {}
+                if (miniChatComposeView?.isAttachedToWindow == true) {
+                    windowManager.removeView(miniChatComposeView)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error removing mini chat view", e)
+            }
         }
     }
 
@@ -481,8 +605,7 @@ class FloatingBubbleService : Service() {
         miniChatInputText = ""
         miniChatMessages.add(MiniChatMessage(content = prompt, isUser = true))
 
-        visualState = JarvisVisualState.THINKING
-        FloatingBubbleManager.setVisualState(visualState)
+        updateVisualState(JarvisVisualState.THINKING)
 
         serviceScope.launch {
             try {
@@ -513,14 +636,12 @@ class FloatingBubbleService : Service() {
                     if (!isMuted && settings.autoTts) {
                         speakResponse(fullResponse, settings)
                     } else {
-                        visualState = JarvisVisualState.IDLE
-                        FloatingBubbleManager.setVisualState(visualState)
+                        updateVisualState(JarvisVisualState.IDLE)
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    visualState = JarvisVisualState.ERROR
-                    FloatingBubbleManager.setVisualState(visualState)
+                    updateVisualState(JarvisVisualState.ERROR)
                     miniChatMessages.add(
                         MiniChatMessage(
                             content = "Error: ${e.localizedMessage ?: "Fallo al procesar"}",
@@ -528,8 +649,7 @@ class FloatingBubbleService : Service() {
                         )
                     )
                     mainHandler.postDelayed({
-                        visualState = JarvisVisualState.IDLE
-                        FloatingBubbleManager.setVisualState(visualState)
+                        updateVisualState(JarvisVisualState.IDLE)
                     }, 2500)
                 }
             }
@@ -537,8 +657,7 @@ class FloatingBubbleService : Service() {
     }
 
     private fun speakResponse(text: String, settings: GenerationSettings) {
-        visualState = JarvisVisualState.SPEAKING
-        FloatingBubbleManager.setVisualState(visualState)
+        updateVisualState(JarvisVisualState.SPEAKING)
 
         serviceScope.launch {
             appContainer.ttsRepository.speak(
@@ -549,8 +668,7 @@ class FloatingBubbleService : Service() {
             val estimatedDurationMs = ((text.length * 55) / settings.ttsSpeed).toLong().coerceIn(1200L, 8000L)
             mainHandler.postDelayed({
                 if (visualState == JarvisVisualState.SPEAKING) {
-                    visualState = JarvisVisualState.IDLE
-                    FloatingBubbleManager.setVisualState(visualState)
+                    updateVisualState(JarvisVisualState.IDLE)
                 }
             }, estimatedDurationMs)
         }
@@ -561,16 +679,14 @@ class FloatingBubbleService : Service() {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
-                        visualState = JarvisVisualState.LISTENING
-                        FloatingBubbleManager.setVisualState(visualState)
+                        updateVisualState(JarvisVisualState.LISTENING)
                     }
                     override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
                     override fun onError(error: Int) {
-                        visualState = JarvisVisualState.IDLE
-                        FloatingBubbleManager.setVisualState(visualState)
+                        updateVisualState(JarvisVisualState.IDLE)
                     }
                     override fun onResults(results: Bundle?) {
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -578,8 +694,7 @@ class FloatingBubbleService : Service() {
                         if (!text.isNullOrBlank()) {
                             miniChatInputText = text
                         }
-                        visualState = JarvisVisualState.IDLE
-                        FloatingBubbleManager.setVisualState(visualState)
+                        updateVisualState(JarvisVisualState.IDLE)
                     }
                     override fun onPartialResults(partialResults: Bundle?) {
                         val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -602,11 +717,10 @@ class FloatingBubbleService : Service() {
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             }
             speechRecognizer?.startListening(intent)
-            visualState = JarvisVisualState.LISTENING
-            FloatingBubbleManager.setVisualState(visualState)
-        } catch (_: Exception) {
-            visualState = JarvisVisualState.IDLE
-            FloatingBubbleManager.setVisualState(visualState)
+            updateVisualState(JarvisVisualState.LISTENING)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error starting voice dictation", e)
+            updateVisualState(JarvisVisualState.IDLE)
         }
     }
 
@@ -615,8 +729,17 @@ class FloatingBubbleService : Service() {
             speechRecognizer?.stopListening()
         } catch (_: Exception) {}
         if (visualState == JarvisVisualState.LISTENING) {
-            visualState = JarvisVisualState.IDLE
-            FloatingBubbleManager.setVisualState(visualState)
+            updateVisualState(JarvisVisualState.IDLE)
+        }
+    }
+
+    private fun safeRemoveView(view: View?) {
+        if (view != null && view.isAttachedToWindow) {
+            try {
+                windowManager.removeView(view)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error removing view", e)
+            }
         }
     }
 
@@ -631,19 +754,9 @@ class FloatingBubbleService : Service() {
 
         serviceScope.cancel()
 
-        try {
-            bubbleComposeView?.let { windowManager.removeView(it) }
-        } catch (_: Exception) {}
-
-        try {
-            if (isMiniChatVisible) {
-                miniChatComposeView?.let { windowManager.removeView(it) }
-            }
-        } catch (_: Exception) {}
-
-        try {
-            dismissTargetComposeView?.let { windowManager.removeView(it) }
-        } catch (_: Exception) {}
+        safeRemoveView(bubbleComposeView)
+        safeRemoveView(miniChatComposeView)
+        safeRemoveView(dismissTargetComposeView)
 
         lifecycleOwner.onDestroy()
     }

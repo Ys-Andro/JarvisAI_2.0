@@ -26,9 +26,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -258,7 +258,7 @@ fun JarvisLiveModeDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isJarvisTalking) Icons.Default.VolumeUp else Icons.Default.Mic,
+                        imageVector = if (isJarvisTalking) Icons.AutoMirrored.Filled.VolumeUp else Icons.Default.Mic,
                         contentDescription = "Live Orb",
                         tint = Color(0xFF001F28),
                         modifier = Modifier.size(56.dp)

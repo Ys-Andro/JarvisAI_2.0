@@ -41,6 +41,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -62,6 +63,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.jarvisai.domain.model.GgufModelState
 import com.example.jarvisai.domain.model.LocalGgufModel
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
 import com.example.jarvisai.ui.theme.JarvisAccentRed
@@ -147,6 +149,104 @@ fun ModelsScreen(
                     onUnloadClick = { viewModel.unloadModel() }
                 )
 
+                // System RAM & Cache Manager Card
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(JarvisSurface)
+                        .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Memory,
+                                contentDescription = null,
+                                tint = JarvisPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (uiState.formattedRamStatus.isNotBlank()) uiState.formattedRamStatus else "RAM Verificada",
+                                color = JarvisTextPrimary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        if (uiState.cacheSizeBytes > 0) {
+                            Text(
+                                text = "Caché: ${uiState.formattedCacheSize}",
+                                color = JarvisTextSecondary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    if (uiState.cacheSizeBytes > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                text = "VACIAR CACHÉ DRIVE",
+                                color = JarvisAccentRed,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable { viewModel.clearModelCache() }
+                                    .padding(vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Import Progress Banner (Storage Access Framework / Google Drive)
+                if (uiState.isImporting) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF002229))
+                            .border(1.dp, JarvisPrimary, RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = uiState.importStatusText ?: "Importando archivo GGUF...",
+                            color = JarvisPrimary,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val progressVal = uiState.importProgressPercent
+                        if (progressVal != null && progressVal > 0) {
+                            LinearProgressIndicator(
+                                progress = { progressVal / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = JarvisPrimary,
+                                trackColor = Color(0xFF003640)
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = JarvisPrimary,
+                                trackColor = Color(0xFF003640)
+                            )
+                        }
+                    }
+                }
+
                 // Models List Header
                 Row(
                     modifier = Modifier
@@ -163,7 +263,7 @@ fun ModelsScreen(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = "FORMATO GGUF",
+                        text = "FORMATO GGUF / ARM64",
                         color = JarvisPrimary,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace
@@ -467,10 +567,16 @@ private fun ModelItemCard(
                     maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = model.formattedSize,
                         color = JarvisPrimary,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "• ${model.architecture.uppercase()}",
+                        color = JarvisTextSecondary,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace
                     )
@@ -480,6 +586,39 @@ private fun ModelItemCard(
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace
                     )
+                    if (model.isCachedFromDrive) {
+                        Text(
+                            text = "• Drive",
+                            color = Color(0xFF80D8FF),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                // Status Badge
+                val (badgeBg, badgeBorder, badgeText, badgeColor) = when (model.state) {
+                    GgufModelState.REGISTERED -> Quadruple(Color(0xFF1E262C), JarvisBorder, "REGISTRADO", JarvisTextSecondary)
+                    GgufModelState.LOADING -> Quadruple(Color(0xFF332B00), Color(0xFFFFD54F), "CARGANDO...", Color(0xFFFFD54F))
+                    GgufModelState.LOADED -> Quadruple(Color(0xFF00363A), JarvisPrimary, "EN RAM", JarvisPrimary)
+                    GgufModelState.RUNNING -> Quadruple(Color(0xFF00283A), Color(0xFF40C4FF), "GENERANDO", Color(0xFF40C4FF))
+                    GgufModelState.ERROR -> Quadruple(Color(0xFF2E1114), JarvisAccentRed, "ERROR", JarvisAccentRed)
+                    GgufModelState.UNLOADED -> Quadruple(Color(0xFF1E262C), JarvisBorder, "DESCARGADO", JarvisTextSecondary)
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(badgeBg)
+                        .border(1.dp, badgeBorder, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        color = badgeColor,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -488,16 +627,18 @@ private fun ModelItemCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (isLoaded) {
+            if (isLoaded || model.state == GgufModelState.LOADED || model.state == GgufModelState.RUNNING) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF00363A))
+                        .background(Color(0xFF2A1418))
+                        .border(1.dp, Color(0xFF632029), RoundedCornerShape(8.dp))
+                        .clickable { onUnloadClick() }
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "CARGADO",
-                        color = JarvisPrimary,
+                        text = "DESCARGAR",
+                        color = JarvisAccentRed,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
@@ -535,6 +676,8 @@ private fun ModelItemCard(
         }
     }
 }
+
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 @Composable
 private fun EmptyModelsPlaceholder(

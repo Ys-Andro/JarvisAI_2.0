@@ -11,8 +11,12 @@ data class LocalGgufModelEntity(
     val fileName: String,
     val filePath: String,
     val sizeBytes: Long,
+    val architecture: String = "llama",
     val quantization: String = "Unknown",
     val contextLength: Int = 2048,
+    val state: String = "REGISTERED",
     val isDefault: Boolean = false,
-    val lastUsedAt: Long = System.currentTimeMillis()
+    val lastUsedAt: Long = System.currentTimeMillis(),
+    val sourceUri: String? = null,
+    val isCachedFromDrive: Boolean = false
 )

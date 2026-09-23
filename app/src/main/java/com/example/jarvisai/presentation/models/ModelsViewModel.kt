@@ -6,8 +6,12 @@ import android.provider.OpenableColumns
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jarvisai.data.util.DeviceMemoryManager
+import com.example.jarvisai.data.util.DriveAndStorageManager
+import com.example.jarvisai.data.util.GgufMetadataParser
 import com.example.jarvisai.domain.model.AppThemeMode
 import com.example.jarvisai.domain.model.GenerationSettings
+import com.example.jarvisai.domain.model.GgufModelState
 import com.example.jarvisai.domain.model.LocalGgufModel
 import com.example.jarvisai.domain.repository.IInferenceRepository
 import com.example.jarvisai.domain.repository.IModelRepository
@@ -49,6 +53,45 @@ class ModelsViewModel(
         observeProviderApiKeys()
         observeSelectedAgent()
         observeFloatingBubble()
+        refreshRamInfo()
+        refreshCacheSize()
+    }
+
+    fun refreshRamInfo() {
+        try {
+            val memInfo = DeviceMemoryManager.getMemoryInfo(context)
+            val availStr = DeviceMemoryManager.formatBytes(memInfo.availMem)
+            val totalStr = DeviceMemoryManager.formatBytes(memInfo.totalMem)
+            _uiState.update {
+                it.copy(
+                    availableRamBytes = memInfo.availMem,
+                    totalRamBytes = memInfo.totalMem,
+                    formattedRamStatus = "RAM disponible: $availStr / $totalStr"
+                )
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun refreshCacheSize() {
+        try {
+            val bytes = DriveAndStorageManager.getCacheSizeBytes(context)
+            _uiState.update {
+                it.copy(
+                    cacheSizeBytes = bytes,
+                    formattedCacheSize = DeviceMemoryManager.formatBytes(bytes)
+                )
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun clearModelCache() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                DriveAndStorageManager.clearCache(context)
+            }
+            refreshCacheSize()
+            _uiState.update { it.copy(statusMessage = "Caché de modelos temporales liberada.") }
+        }
     }
 
     private fun observeFloatingBubble() {
@@ -137,6 +180,7 @@ class ModelsViewModel(
                     statusMessage = "Cargando ${model.name} en memoria RAM..."
                 )
             }
+            modelRepository.updateModelState(model.id, GgufModelState.LOADING)
 
             val settings = _uiState.value.settings
             val result = inferenceRepository.loadModel(
@@ -146,7 +190,9 @@ class ModelsViewModel(
             )
 
             if (result.isSuccess) {
+                modelRepository.updateModelState(model.id, GgufModelState.LOADED)
                 modelRepository.setDefaultModel(model.id)
+                refreshRamInfo()
                 _uiState.update {
                     it.copy(
                         isLoadingModel = false,
@@ -156,6 +202,8 @@ class ModelsViewModel(
                     )
                 }
             } else {
+                modelRepository.updateModelState(model.id, GgufModelState.ERROR)
+                refreshRamInfo()
                 val err = result.exceptionOrNull()?.message ?: "Error al cargar el modelo"
                 _uiState.update {
                     it.copy(
@@ -170,7 +218,12 @@ class ModelsViewModel(
 
     fun unloadModel() {
         viewModelScope.launch {
+            val currentActive = _uiState.value.activeModel
+            if (currentActive != null) {
+                modelRepository.updateModelState(currentActive.id, GgufModelState.UNLOADED)
+            }
             inferenceRepository.unloadModel()
+            refreshRamInfo()
             _uiState.update {
                 it.copy(
                     statusMessage = "Modelo descargado. Memoria RAM liberada.",
@@ -184,55 +237,112 @@ class ModelsViewModel(
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
-                    isLoadingModel = true,
-                    statusMessage = "Importando archivo GGUF..."
+                    isImporting = true,
+                    importProgressPercent = 0,
+                    importStatusText = "Inspeccionando encabezado del archivo...",
+                    statusMessage = "Preparando importación..."
                 )
             }
 
             try {
-                val (fileName, sizeBytes) = getUriDetails(uri)
-                val cleanModelName = fileName.removeSuffix(".gguf").replace("_", " ").replace("-", " ")
+                val details = DriveAndStorageManager.getDocumentDetails(context, uri)
 
-                val destinationFile = File(context.filesDir, "models/$fileName")
-                destinationFile.parentFile?.mkdirs()
-
-                // Copy stream to internal app storage for reliable mmap
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        FileOutputStream(destinationFile).use { output ->
-                            input.copyTo(output)
-                        }
-                    }
+                // 1. Verify GGUF header from stream prior to copying multi-GB file
+                val isValidGguf = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val meta = GgufMetadataParser.parseFromStream(stream, details.displayName)
+                        meta.isValidGguf
+                    } ?: false
                 }
 
-                // Detect quantization from filename (e.g. Q4_K_M, Q8_0, etc.)
-                val quant = detectQuantization(fileName)
-
-                val registeredModel = modelRepository.registerImportedModel(
-                    name = cleanModelName,
-                    fileName = fileName,
-                    filePath = destinationFile.absolutePath,
-                    sizeBytes = destinationFile.length(),
-                    quantization = quant
-                )
+                if (!isValidGguf && !details.displayName.endsWith(".gguf", ignoreCase = true)) {
+                    _uiState.update {
+                        it.copy(
+                            isImporting = false,
+                            importProgressPercent = null,
+                            importStatusText = null,
+                            errorMessage = "El archivo seleccionado no tiene la firma mágica GGUF válida."
+                        )
+                    }
+                    return@launch
+                }
 
                 _uiState.update {
                     it.copy(
-                        isLoadingModel = false,
-                        statusMessage = "Modelo '$cleanModelName' importado con éxito."
+                        importStatusText = "Copiando a almacenamiento interno..."
                     )
                 }
 
-                // Auto-load if no model is active
-                if (_uiState.value.activeModel == null) {
-                    loadModel(registeredModel)
+                // 2. Cache with real-time percentage progress callback
+                val copyResult = DriveAndStorageManager.cacheModelFromUri(
+                    context = context,
+                    uri = uri,
+                    details = details
+                ) { progress ->
+                    val copiedStr = DeviceMemoryManager.formatBytes(progress.bytesCopied)
+                    val totalStr = DeviceMemoryManager.formatBytes(progress.totalBytes)
+                    _uiState.update {
+                        it.copy(
+                            importProgressPercent = progress.percentage,
+                            importStatusText = "Copiando: ${progress.percentage}% ($copiedStr / $totalStr)"
+                        )
+                    }
+                }
+
+                if (copyResult.isFailure) {
+                    val err = copyResult.exceptionOrNull()?.message ?: "Error al copiar el archivo"
+                    _uiState.update {
+                        it.copy(
+                            isImporting = false,
+                            importProgressPercent = null,
+                            importStatusText = null,
+                            errorMessage = err
+                        )
+                    }
+                    return@launch
+                }
+
+                val cachedFile = copyResult.getOrThrow()
+
+                // 3. Parse complete GGUF metadata from the cached file
+                val metadata = withContext(Dispatchers.IO) {
+                    GgufMetadataParser.parseFromFile(cachedFile)
+                }
+
+                val modelName = if (metadata.modelName.isNotBlank()) metadata.modelName else GgufMetadataParser.cleanModelName(cachedFile.name)
+
+                // 4. Register in database with metadata
+                modelRepository.registerImportedModel(
+                    name = modelName,
+                    fileName = cachedFile.name,
+                    filePath = cachedFile.absolutePath,
+                    sizeBytes = cachedFile.length(),
+                    quantization = metadata.quantization,
+                    architecture = metadata.architecture,
+                    contextLength = metadata.contextLength,
+                    sourceUri = uri.toString(),
+                    isCachedFromDrive = details.isFromCloud
+                )
+
+                refreshCacheSize()
+                refreshRamInfo()
+
+                _uiState.update {
+                    it.copy(
+                        isImporting = false,
+                        importProgressPercent = null,
+                        importStatusText = null,
+                        statusMessage = "Modelo '$modelName' importado y registrado con éxito. Toca 'Cargar en RAM' cuando desees activarlo."
+                    )
                 }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error importing GGUF file", e)
                 _uiState.update {
                     it.copy(
-                        isLoadingModel = false,
+                        isImporting = false,
+                        importProgressPercent = null,
+                        importStatusText = null,
                         errorMessage = "Error importando GGUF: ${e.localizedMessage}"
                     )
                 }
@@ -240,40 +350,17 @@ class ModelsViewModel(
         }
     }
 
-    private fun getUriDetails(uri: Uri): Pair<String, Long> {
-        var name = "model_${System.currentTimeMillis()}.gguf"
-        var size = 0L
-        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (cursor.moveToFirst()) {
-                if (nameIndex != -1) name = cursor.getString(nameIndex) ?: name
-                if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
-            }
-        }
-        return Pair(name, size)
-    }
-
-    private fun detectQuantization(fileName: String): String {
-        val uppercase = fileName.uppercase()
-        val quants = listOf(
-            "Q4_K_M", "Q4_K_S", "Q4_0", "Q4_1",
-            "Q5_K_M", "Q5_K_S", "Q5_0", "Q5_1",
-            "Q8_0", "Q6_K", "Q2_K", "Q3_K_M", "F16", "BF16"
-        )
-        return quants.firstOrNull { uppercase.contains(it) } ?: "GGUF"
-    }
-
     fun deleteModel(model: LocalGgufModel) {
         viewModelScope.launch {
             if (_uiState.value.activeModel?.id == model.id) {
-                inferenceRepository.unloadModel()
+                unloadModel()
             }
             modelRepository.deleteModel(model.id)
             withContext(Dispatchers.IO) {
-                val file = File(model.filePath)
-                if (file.exists()) file.delete()
+                DriveAndStorageManager.deleteCachedFile(model.filePath)
             }
+            refreshCacheSize()
+            refreshRamInfo()
             _uiState.update { it.copy(statusMessage = "Modelo eliminado.") }
         }
     }

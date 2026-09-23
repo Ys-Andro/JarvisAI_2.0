@@ -68,6 +68,7 @@ jobs:
           ls -lh "$APK"
           unzip -t "$APK"
           unzip -l "$APK" | grep -E "AndroidManifest.xml|classes.dex" || (echo "APK incompleto o sin manifiesto/dex" && exit 1)
+          unzip -l "$APK" | grep "lib/arm64-v8a/libllama-android.so" || (echo "Librería nativa llama.cpp no encontrada en APK arm64-v8a" && exit 1)
           mkdir -p dist
           cp "$APK" dist/app-debug.apk
           tar -cf dist/jarvis-debug.tar -C dist app-debug.apk
@@ -76,7 +77,7 @@ jobs:
           mkdir -p /tmp/apkcheck
           tar -xf dist/jarvis-debug.tar -C /tmp/apkcheck
           unzip -t /tmp/apkcheck/app-debug.apk
-          echo "APK listo para instalar"
+          echo "APK Debug listo para instalar con librerías nativas ARM64"
 
       - name: Upload Debug APK tar (Backup artifact)
         uses: actions/upload-artifact@v4
@@ -99,16 +100,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Release APK
-        run: gradle :app:assembleRelease --stacktrace --no-daemon || true
+        run: gradle :app:assembleRelease --stacktrace --no-daemon
 
-      - name: Pack Release APK
+      - name: Verify and Pack Release APK
         run: |
-          if ls app/build/outputs/apk/release/*.apk 1>/dev/null 2>&1; then
-            mkdir -p dist-release
-            APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
-            cp "$APK" dist-release/app-release.apk
-            tar -cf dist-release/jarvis-release.tar -C dist-release app-release.apk
-          fi
+          set -e
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          echo "Release APK=$APK"
+          ls -lh "$APK"
+          unzip -t "$APK"
+          unzip -l "$APK" | grep -E "AndroidManifest.xml|classes.dex" || (echo "Release APK incompleto" && exit 1)
+          unzip -l "$APK" | grep "lib/arm64-v8a/libllama-android.so" || (echo "Librería nativa llama.cpp no encontrada en Release APK" && exit 1)
+          mkdir -p dist-release
+          cp "$APK" dist-release/app-release.apk
+          tar -cf dist-release/jarvis-release.tar -C dist-release app-release.apk
 
       - name: Upload Release APK tar
         uses: actions/upload-artifact@v4
@@ -117,4 +122,4 @@ jobs:
           path: dist-release/jarvis-release.tar
           compression-level: 0
           retention-days: 14
-          if-no-files-found: ignore
+          if-no-files-found: error

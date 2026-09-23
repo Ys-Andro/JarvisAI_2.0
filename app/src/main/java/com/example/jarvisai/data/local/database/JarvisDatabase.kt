@@ -23,7 +23,7 @@ import com.example.jarvisai.data.local.database.entity.MessageEntity
         MemoryEntity::class,
         DocumentEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class JarvisDatabase : RoomDatabase() {

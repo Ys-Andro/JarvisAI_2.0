@@ -41,6 +41,9 @@ interface ModelDao {
     @Query("UPDATE local_models SET lastUsedAt = :timestamp WHERE id = :id")
     suspend fun updateLastUsed(id: String, timestamp: Long = System.currentTimeMillis())
 
+    @Query("UPDATE local_models SET state = :state WHERE id = :id")
+    suspend fun updateModelState(id: String, state: String)
+
     @Query("DELETE FROM local_models WHERE id = :id")
     suspend fun deleteModelById(id: String)
 }

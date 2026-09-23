@@ -6,11 +6,15 @@ data class LocalGgufModel(
     val fileName: String,
     val filePath: String,
     val sizeBytes: Long,
+    val architecture: String = "llama",
     val quantization: String = "Unknown",
     val contextLength: Int = 2048,
+    val state: GgufModelState = GgufModelState.REGISTERED,
     val isLoaded: Boolean = false,
     val isDefault: Boolean = false,
-    val lastUsedAt: Long = System.currentTimeMillis()
+    val lastUsedAt: Long = System.currentTimeMillis(),
+    val sourceUri: String? = null,
+    val isCachedFromDrive: Boolean = false
 ) {
     val formattedSize: String
         get() {

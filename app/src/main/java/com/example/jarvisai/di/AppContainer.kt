@@ -86,8 +86,16 @@ class AppContainer(private val context: Context) {
         ConversationRepositoryImpl(conversationDao, messageDao)
     }
 
-    val inferenceRepository: IInferenceRepository by lazy {
+    val llamaInferenceRepository: com.example.jarvisai.data.repository.LlamaInferenceRepository by lazy {
+        com.example.jarvisai.data.repository.LlamaInferenceRepository(context)
+    }
+
+    val geminiInferenceRepository: GeminiInferenceRepository by lazy {
         GeminiInferenceRepository(context, geminiApiClient, universalApiClient, settingsRepository, memoryRepository)
+    }
+
+    val inferenceRepository: IInferenceRepository by lazy {
+        com.example.jarvisai.data.repository.HybridInferenceRepository(llamaInferenceRepository, geminiInferenceRepository)
     }
 
     val modelRepository: IModelRepository by lazy {
