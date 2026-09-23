@@ -8,10 +8,8 @@ import com.example.jarvisai.data.local.database.dao.ConversationDao
 import com.example.jarvisai.data.local.database.dao.DocumentDao
 import com.example.jarvisai.data.local.database.dao.MemoryDao
 import com.example.jarvisai.data.local.database.dao.MessageDao
-import com.example.jarvisai.data.local.database.dao.ModelDao
 import com.example.jarvisai.data.local.database.entity.ConversationEntity
 import com.example.jarvisai.data.local.database.entity.DocumentEntity
-import com.example.jarvisai.data.local.database.entity.LocalGgufModelEntity
 import com.example.jarvisai.data.local.database.entity.MemoryEntity
 import com.example.jarvisai.data.local.database.entity.MessageEntity
 
@@ -19,7 +17,6 @@ import com.example.jarvisai.data.local.database.entity.MessageEntity
     entities = [
         ConversationEntity::class,
         MessageEntity::class,
-        LocalGgufModelEntity::class,
         MemoryEntity::class,
         DocumentEntity::class
     ],
@@ -30,7 +27,6 @@ abstract class JarvisDatabase : RoomDatabase() {
 
     abstract fun conversationDao(): ConversationDao
     abstract fun messageDao(): MessageDao
-    abstract fun modelDao(): ModelDao
     abstract fun memoryDao(): MemoryDao
     abstract fun documentDao(): DocumentDao
 

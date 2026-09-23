@@ -23,33 +23,19 @@ data class CloudAiModel(
 ) {
     companion object {
         val ALL_MODELS = listOf(
-            // Google Gemini
+            // Google Gemini (Default Model: gemini-3.6-flash)
             CloudAiModel(
                 id = "gemini-3.6-flash",
                 provider = ModelProvider.GEMINI,
                 name = "Gemini 3.6 Flash",
-                description = "Próxima generación: Inteligencia ultra avanzada y velocidad extrema",
-                defaultContextLength = 2097152
-            ),
-            CloudAiModel(
-                id = "gemini-2.5-flash",
-                provider = ModelProvider.GEMINI,
-                name = "Gemini 2.5 Flash",
-                description = "Ultra rápido y multimodal (Recomendado)",
+                description = "Predeterminado: Ultrarrápido, multimodal y alta precisión",
                 defaultContextLength = 1048576
-            ),
-            CloudAiModel(
-                id = "gemini-2.5-pro",
-                provider = ModelProvider.GEMINI,
-                name = "Gemini 2.5 Pro",
-                description = "Máximo razonamiento y lógica profunda",
-                defaultContextLength = 2097152
             ),
             CloudAiModel(
                 id = "gemini-2.0-flash",
                 provider = ModelProvider.GEMINI,
                 name = "Gemini 2.0 Flash",
-                description = "Generación ágil y eficiente",
+                description = "Generación ágil y eficiente multimodal",
                 defaultContextLength = 1048576
             ),
 

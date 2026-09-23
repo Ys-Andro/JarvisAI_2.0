@@ -1,8 +1,8 @@
 package com.example.jarvisai.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import android.content.Context
 import com.example.jarvisai.di.AppContainer
 import com.example.jarvisai.presentation.chat.ChatViewModel
 import com.example.jarvisai.presentation.documents.DocumentsViewModel
@@ -34,8 +34,6 @@ class JarvisViewModelFactory(
             }
             modelClass.isAssignableFrom(ModelsViewModel::class.java) -> {
                 ModelsViewModel(
-                    modelRepository = appContainer.modelRepository,
-                    inferenceRepository = appContainer.inferenceRepository,
                     settingsRepository = appContainer.settingsRepository,
                     ttsRepository = appContainer.ttsRepository,
                     context = context

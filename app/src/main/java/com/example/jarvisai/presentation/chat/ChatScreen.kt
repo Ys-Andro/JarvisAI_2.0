@@ -96,13 +96,6 @@ fun ChatScreen(
 
     var showLiveMode by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isLiveModeRequested) {
-        if (uiState.isLiveModeRequested) {
-            showLiveMode = true
-            viewModel.dismissLiveMode()
-        }
-    }
-
     // Speech-To-Text launcher
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -276,7 +269,7 @@ fun ChatScreen(
                     val currentModel = CloudAiModel.ALL_MODELS.firstOrNull { it.id == uiState.selectedModelId }
                     EmptyChatPlaceholder(
                         isModelLoaded = uiState.isModelLoaded,
-                        modelName = currentModel?.name ?: uiState.activeModel?.name,
+                        modelName = currentModel?.name ?: "Gemini 3.6 Flash",
                         onConfigureModelClick = onNavigateToModels
                     )
                 } else {

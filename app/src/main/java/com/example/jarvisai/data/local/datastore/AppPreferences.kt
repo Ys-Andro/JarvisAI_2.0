@@ -24,7 +24,6 @@ class AppPreferences(private val context: Context) {
     private val dataStore: DataStore<Preferences> = context.jarvisDataStore
 
     private object Keys {
-        val SELECTED_MODEL_ID = stringPreferencesKey("selected_model_id")
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
         val OPENROUTER_API_KEY = stringPreferencesKey("openrouter_api_key")
         val OPENAI_API_KEY = stringPreferencesKey("openai_api_key")
@@ -38,7 +37,6 @@ class AppPreferences(private val context: Context) {
         val TOP_K = intPreferencesKey("top_k")
         val MAX_TOKENS = intPreferencesKey("max_tokens")
         val CONTEXT_SIZE = intPreferencesKey("context_size")
-        val CPU_THREADS = intPreferencesKey("cpu_threads")
         val SYSTEM_PROMPT = stringPreferencesKey("system_prompt")
         val AUTO_TTS = booleanPreferencesKey("auto_tts")
         val TTS_SPEED = floatPreferencesKey("tts_speed")
@@ -46,7 +44,6 @@ class AppPreferences(private val context: Context) {
         val ANDROID_VOICE_NAME = stringPreferencesKey("android_voice_name")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
-        val FLOATING_BUBBLE_ENABLED = booleanPreferencesKey("floating_bubble_enabled")
     }
 
     private val safePreferences: Flow<Preferences> = dataStore.data
@@ -57,10 +54,6 @@ class AppPreferences(private val context: Context) {
                 throw exception
             }
         }
-
-    val selectedModelId: Flow<String?> = safePreferences.map { preferences ->
-        preferences[Keys.SELECTED_MODEL_ID]
-    }
 
     val apiKey: Flow<String?> = safePreferences.map { preferences ->
         preferences[Keys.GEMINI_API_KEY]
@@ -94,7 +87,7 @@ class AppPreferences(private val context: Context) {
     }
 
     val selectedGeminiModel: Flow<String> = safePreferences.map { preferences ->
-        preferences[Keys.SELECTED_GEMINI_MODEL] ?: "gemini-2.5-flash"
+        preferences[Keys.SELECTED_GEMINI_MODEL] ?: "gemini-3.6-flash"
     }
 
     val generationSettings: Flow<GenerationSettings> = safePreferences.map { preferences ->
@@ -102,14 +95,13 @@ class AppPreferences(private val context: Context) {
             temperature = preferences[Keys.TEMPERATURE] ?: 0.7f,
             topP = preferences[Keys.TOP_P] ?: 0.9f,
             topK = preferences[Keys.TOP_K] ?: 40,
-            maxTokens = preferences[Keys.MAX_TOKENS] ?: 1024,
-            contextWindow = preferences[Keys.CONTEXT_SIZE] ?: 2048,
-            cpuThreads = preferences[Keys.CPU_THREADS] ?: defaultOptimalThreads(),
+            maxTokens = preferences[Keys.MAX_TOKENS] ?: 2048,
+            contextWindow = preferences[Keys.CONTEXT_SIZE] ?: 128000,
             systemPrompt = preferences[Keys.SYSTEM_PROMPT]
-                ?: "You are Jarvis, an intelligent, helpful, and concise AI assistant running completely offline on the user's device.",
+                ?: "You are Jarvis, an intelligent, helpful, and concise AI assistant.",
             autoTts = preferences[Keys.AUTO_TTS] ?: false,
             ttsSpeed = preferences[Keys.TTS_SPEED] ?: 1.0f,
-            ttsPitch = preferences[Keys.TTS_PITCH] ?: 1.0f,
+            ttsPitch = preferences[Keys.TTS_PITCH] ?: 0.85f,
             androidVoiceName = preferences[Keys.ANDROID_VOICE_NAME] ?: ""
         )
     }
@@ -127,16 +119,6 @@ class AppPreferences(private val context: Context) {
         preferences[Keys.SELECTED_AGENT_ID] ?: "jarvis_prime"
     }
 
-    suspend fun setSelectedModelId(modelId: String?) {
-        dataStore.edit { preferences ->
-            if (modelId != null) {
-                preferences[Keys.SELECTED_MODEL_ID] = modelId
-            } else {
-                preferences.remove(Keys.SELECTED_MODEL_ID)
-            }
-        }
-    }
-
     suspend fun updateGenerationSettings(settings: GenerationSettings) {
         dataStore.edit { preferences ->
             preferences[Keys.TEMPERATURE] = settings.temperature
@@ -144,7 +126,6 @@ class AppPreferences(private val context: Context) {
             preferences[Keys.TOP_K] = settings.topK
             preferences[Keys.MAX_TOKENS] = settings.maxTokens
             preferences[Keys.CONTEXT_SIZE] = settings.contextWindow
-            preferences[Keys.CPU_THREADS] = settings.cpuThreads
             preferences[Keys.SYSTEM_PROMPT] = settings.systemPrompt
             preferences[Keys.AUTO_TTS] = settings.autoTts
             preferences[Keys.TTS_SPEED] = settings.ttsSpeed
@@ -174,12 +155,6 @@ class AppPreferences(private val context: Context) {
     suspend fun updateContextSize(contextSize: Int) {
         dataStore.edit { preferences ->
             preferences[Keys.CONTEXT_SIZE] = contextSize
-        }
-    }
-
-    suspend fun updateCpuThreads(threads: Int) {
-        dataStore.edit { preferences ->
-            preferences[Keys.CPU_THREADS] = threads
         }
     }
 
@@ -243,23 +218,6 @@ class AppPreferences(private val context: Context) {
     suspend fun setSelectedAgentId(agentId: String) {
         dataStore.edit { preferences ->
             preferences[Keys.SELECTED_AGENT_ID] = agentId
-        }
-    }
-
-    val floatingBubbleEnabled: Flow<Boolean> = safePreferences.map { preferences ->
-        preferences[Keys.FLOATING_BUBBLE_ENABLED] ?: false
-    }
-
-    suspend fun setFloatingBubbleEnabled(enabled: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[Keys.FLOATING_BUBBLE_ENABLED] = enabled
-        }
-    }
-
-    companion object {
-        fun defaultOptimalThreads(): Int {
-            val cores = Runtime.getRuntime().availableProcessors()
-            return (cores - 1).coerceIn(2, 6)
         }
     }
 }

@@ -1,7 +1,5 @@
 package com.example.jarvisai.presentation.navigation
 
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
@@ -20,7 +18,6 @@ import com.example.jarvisai.presentation.library.LibraryScreen
 import com.example.jarvisai.presentation.library.LibraryViewModel
 import com.example.jarvisai.presentation.memory.MemoryScreen
 import com.example.jarvisai.presentation.memory.MemoryViewModel
-import com.example.jarvisai.presentation.models.ModelsScreen
 import com.example.jarvisai.presentation.models.ModelsViewModel
 import com.example.jarvisai.presentation.settings.SettingsScreen
 
@@ -63,18 +60,6 @@ fun JarvisNavHost(
                 },
                 onBackClick = {
                     navController.popBackStack()
-                }
-            )
-        }
-
-        composable(Screen.Models.route) {
-            ModelsScreen(
-                viewModel = modelsViewModel,
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                onNavigateToSettings = {
-                    navController.navigate(Screen.Settings.route)
                 }
             )
         }

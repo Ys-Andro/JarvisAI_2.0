@@ -1,8 +1,8 @@
 package com.example.jarvisai.presentation.chat
 
 import com.example.jarvisai.domain.model.Conversation
-import com.example.jarvisai.domain.model.LocalGgufModel
 import com.example.jarvisai.domain.model.Message
+import com.example.jarvisai.domain.model.ModelProvider
 
 /**
  * UI State for ChatScreen.
@@ -10,8 +10,7 @@ import com.example.jarvisai.domain.model.Message
 data class ChatUiState(
     val conversation: Conversation? = null,
     val messages: List<Message> = emptyList(),
-    val activeModel: LocalGgufModel? = null,
-    val selectedModelId: String = "gemini-2.5-flash",
+    val selectedModelId: String = "gemini-3.6-flash",
     val providerApiKeys: Map<String, String> = emptyMap(),
     val isModelLoaded: Boolean = false,
     val inputPrompt: String = "",
@@ -26,11 +25,10 @@ data class ChatUiState(
     val speakingMessageId: String? = null,
     val streamingMessageId: String? = null,
     val tokensPerSecond: Float = 0f,
-    val isLiveModeRequested: Boolean = false,
     val errorMessage: String? = null
 ) {
-    fun isProviderReady(provider: com.example.jarvisai.domain.model.ModelProvider): Boolean {
-        if (provider == com.example.jarvisai.domain.model.ModelProvider.GEMINI) {
+    fun isProviderReady(provider: ModelProvider): Boolean {
+        if (provider == ModelProvider.GEMINI) {
             val provKey = providerApiKeys["gemini"]
             val buildKey = try {
                 com.example.BuildConfig.GEMINI_API_KEY
@@ -46,7 +44,6 @@ data class ChatUiState(
 
 sealed interface ChatInferenceStatus {
     object Idle : ChatInferenceStatus
-    data class LoadingModel(val modelName: String) : ChatInferenceStatus
     data class Generating(val tokensPerSecond: Float = 0f) : ChatInferenceStatus
     data class Error(val message: String) : ChatInferenceStatus
 }

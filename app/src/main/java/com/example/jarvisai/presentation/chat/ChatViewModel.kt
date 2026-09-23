@@ -6,7 +6,6 @@ import com.example.BuildConfig
 import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.domain.model.GenerationSettings
 import com.example.jarvisai.domain.model.InferenceState
-import com.example.jarvisai.domain.model.LocalGgufModel
 import com.example.jarvisai.domain.model.Message
 import com.example.jarvisai.domain.model.ModelProvider
 import com.example.jarvisai.domain.model.Role
@@ -43,7 +42,6 @@ class ChatViewModel(
 
     init {
         observeInferenceState()
-        observeActiveModel()
         observeTtsState()
         observeModelAndApiKeys()
         initDefaultConversation()
@@ -181,24 +179,6 @@ class ChatViewModel(
                             )
                         }
                     }
-                    is InferenceState.LoadingModel -> {
-                        _uiState.update {
-                            it.copy(
-                                inferenceStatus = ChatInferenceStatus.LoadingModel(state.modelName),
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is InferenceState.ModelReady -> {
-                        _uiState.update {
-                            it.copy(
-                                activeModel = state.model,
-                                isModelLoaded = true,
-                                inferenceStatus = ChatInferenceStatus.Idle,
-                                errorMessage = null
-                            )
-                        }
-                    }
                     is InferenceState.Generating -> {
                         _uiState.update {
                             it.copy(
@@ -215,19 +195,6 @@ class ChatViewModel(
                             )
                         }
                     }
-                }
-            }
-        }
-    }
-
-    private fun observeActiveModel() {
-        viewModelScope.launch {
-            inferenceRepository.activeModel.collect { model ->
-                _uiState.update {
-                    it.copy(
-                        activeModel = model,
-                        isModelLoaded = model != null
-                    )
                 }
             }
         }
@@ -295,7 +262,6 @@ class ChatViewModel(
 
         val conversationId = currentConversationId ?: return
 
-        // 1. Clear input field and attached image immediately
         val attachedUri = _uiState.value.attachedImageUri
         val attachedBase64 = _uiState.value.attachedImageBase64
         val attachedMime = _uiState.value.attachedImageMimeType
@@ -326,7 +292,6 @@ class ChatViewModel(
         }
 
         viewModelScope.launch {
-            // 2. Insert User message into Room (with attached image if any)
             val userMsg = Message(
                 id = UUID.randomUUID().toString(),
                 conversationId = conversationId,
@@ -337,14 +302,12 @@ class ChatViewModel(
             )
             conversationRepository.insertMessage(userMsg)
 
-            // Update conversation title if this is the first user prompt
             val currentConv = _uiState.value.conversation
             if (currentConv != null && currentConv.messageCount == 0) {
                 val autoTitle = if (prompt.length > 28) prompt.take(28) + "..." else prompt
                 conversationRepository.updateConversationTitle(conversationId, autoTitle)
             }
 
-            // 3. Prepare Assistant placeholder message
             val assistantMsgId = UUID.randomUUID().toString()
             val initialAssistantMsg = Message(
                 id = assistantMsgId,
@@ -357,11 +320,9 @@ class ChatViewModel(
             conversationRepository.insertMessage(initialAssistantMsg)
             _uiState.update { it.copy(streamingMessageId = assistantMsgId) }
 
-            // 4. Retrieve settings & history
             val settings = settingsRepository.getSettings().first()
             val history = _uiState.value.messages
 
-            // 5. Launch native token generation streaming
             executeInferenceStream(
                 assistantMsgId = assistantMsgId,
                 prompt = effectivePrompt,
@@ -408,7 +369,6 @@ class ChatViewModel(
                     val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1L)
                     val tokPerSec = (tokenCount.toFloat() / (elapsedMs.toFloat() / 1000f))
 
-                    // Update streaming message in Room database
                     conversationRepository.updateMessageContent(
                         messageId = assistantMsgId,
                         content = responseBuilder.toString(),
@@ -427,7 +387,6 @@ class ChatViewModel(
                 )
             }
 
-            // Auto-speak response if configured
             val finalResponse = responseBuilder.toString()
             if (settings.autoTts && finalResponse.isNotBlank()) {
                 speakText(finalResponse)
@@ -544,14 +503,6 @@ class ChatViewModel(
 
     fun dismissError() {
         _uiState.update { it.copy(errorMessage = null) }
-    }
-
-    fun openLiveMode() {
-        _uiState.update { it.copy(isLiveModeRequested = true) }
-    }
-
-    fun dismissLiveMode() {
-        _uiState.update { it.copy(isLiveModeRequested = false) }
     }
 
     override fun onCleared() {
