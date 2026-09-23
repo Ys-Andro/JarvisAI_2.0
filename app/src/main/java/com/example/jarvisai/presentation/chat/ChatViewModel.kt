@@ -14,6 +14,7 @@ import com.example.jarvisai.domain.repository.IDocumentRepository
 import com.example.jarvisai.domain.repository.IInferenceRepository
 import com.example.jarvisai.domain.repository.ISettingsRepository
 import com.example.jarvisai.domain.repository.ITtsRepository
+import com.example.jarvisai.domain.voice.ILiveVoiceEngine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +31,8 @@ class ChatViewModel(
     private val inferenceRepository: IInferenceRepository,
     private val settingsRepository: ISettingsRepository,
     private val ttsRepository: ITtsRepository,
-    private val documentRepository: IDocumentRepository
+    private val documentRepository: IDocumentRepository,
+    val liveVoiceEngine: ILiveVoiceEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -44,7 +46,85 @@ class ChatViewModel(
         observeInferenceState()
         observeTtsState()
         observeModelAndApiKeys()
+        observeSettings()
         initDefaultConversation()
+        setupLiveVoiceEngine()
+    }
+
+    private fun setupLiveVoiceEngine() {
+        liveVoiceEngine.setResponseProvider { query ->
+            generateDirectAnswer(query)
+        }
+    }
+
+    private suspend fun generateDirectAnswer(query: String): String {
+        return try {
+            val convId = currentConversationId ?: run {
+                val newId = conversationRepository.createConversation(
+                    title = "Conversación Jarvis Live",
+                    modelId = _uiState.value.selectedModelId
+                )
+                currentConversationId = newId
+                newId
+            }
+
+            val userMsg = Message(
+                id = UUID.randomUUID().toString(),
+                conversationId = convId,
+                role = Role.USER,
+                content = query,
+                timestamp = System.currentTimeMillis()
+            )
+            conversationRepository.insertMessage(userMsg)
+
+            val assistantMsgId = UUID.randomUUID().toString()
+            val assistantMsg = Message(
+                id = assistantMsgId,
+                conversationId = convId,
+                role = Role.ASSISTANT,
+                content = "",
+                timestamp = System.currentTimeMillis() + 1
+            )
+            conversationRepository.insertMessage(assistantMsg)
+
+            val settings = settingsRepository.getSettings().first()
+            val history = _uiState.value.messages
+            val responseBuilder = StringBuilder()
+            val startTime = System.currentTimeMillis()
+            var tokenCount = 0
+
+            inferenceRepository.generateCompletionStream(
+                prompt = query,
+                conversationHistory = history,
+                settings = settings
+            ).collect { chunk ->
+                tokenCount++
+                responseBuilder.append(chunk)
+            }
+
+            val result = responseBuilder.toString()
+            val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1L)
+            val tokPerSec = (tokenCount.toFloat() / (elapsedMs.toFloat() / 1000f))
+
+            conversationRepository.updateMessageContent(
+                messageId = assistantMsgId,
+                content = result,
+                tokensPerSec = tokPerSec,
+                durationMs = elapsedMs
+            )
+
+            result.ifBlank { "Procesado correctamente." }
+        } catch (e: Exception) {
+            "Entendido. Hubo un detalle al procesar: ${e.message}"
+        }
+    }
+
+    private fun observeSettings() {
+        viewModelScope.launch {
+            settingsRepository.getSettings().collect { currentSettings ->
+                _uiState.update { it.copy(settings = currentSettings) }
+            }
+        }
     }
 
     private fun observeModelAndApiKeys() {
@@ -501,6 +581,28 @@ class ChatViewModel(
         }
     }
 
+    fun updateVoiceSettings(pitch: Float, speed: Float, voiceName: String) {
+        viewModelScope.launch {
+            val current = settingsRepository.getSettings().first()
+            val updated = current.copy(
+                ttsPitch = pitch,
+                ttsSpeed = speed,
+                androidVoiceName = voiceName
+            )
+            settingsRepository.updateSettings(updated)
+        }
+    }
+
+    fun testLiveVoice(pitch: Float, speed: Float, voiceName: String) {
+        viewModelScope.launch {
+            ttsRepository.speak(
+                text = "Hola, soy Jarvis. Tu sistema de inteligencia artificial en tiempo real.",
+                pitch = pitch,
+                speed = speed
+            )
+        }
+    }
+
     fun dismissError() {
         _uiState.update { it.copy(errorMessage = null) }
     }
@@ -508,6 +610,7 @@ class ChatViewModel(
     override fun onCleared() {
         super.onCleared()
         generationJob?.cancel()
+        liveVoiceEngine.release()
         viewModelScope.launch {
             ttsRepository.stop()
         }

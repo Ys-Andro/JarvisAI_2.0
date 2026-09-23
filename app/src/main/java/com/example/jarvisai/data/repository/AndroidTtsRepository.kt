@@ -96,21 +96,30 @@ class AndroidTtsRepository(
         val targetLocale = if (isSpanish) Locale("es", "ES") else Locale.US
         tts?.setLanguage(targetLocale)
 
-        // Optimized clarity for Spanish (speed 0.95, pitch 0.9)
-        val effectivePitch = if (isSpanish) 0.9f else (if (pitch == 1.0f) settings.ttsPitch else pitch)
-        val effectiveSpeed = if (isSpanish) 0.95f else speed
-        tts?.setPitch(effectivePitch)
-        tts?.setSpeechRate(effectiveSpeed)
+        // Apply user-configured pitch and speed faithfully
+        val effectivePitch = if (pitch != 1.0f) pitch else settings.ttsPitch
+        val effectiveSpeed = if (speed != 1.0f) speed else settings.ttsSpeed
+        tts?.setPitch(effectivePitch.coerceIn(0.5f, 2.0f))
+        tts?.setSpeechRate(effectiveSpeed.coerceIn(0.5f, 2.5f))
 
         try {
-            if (!isSpanish && settings.androidVoiceName.isNotBlank()) {
-                tts?.voices?.find { it.name == settings.androidVoiceName }?.let { voice ->
-                    tts?.voice = voice
+            if (settings.androidVoiceName.isNotBlank()) {
+                val matchedVoice = tts?.voices?.find { it.name == settings.androidVoiceName }
+                if (matchedVoice != null) {
+                    tts?.voice = matchedVoice
+                } else {
+                    val langCode = if (isSpanish) "es" else "en"
+                    val fallbackVoice = tts?.voices?.firstOrNull {
+                        it.locale.language == langCode && it.name.contains("male", ignoreCase = true)
+                    } ?: tts?.voices?.firstOrNull { it.locale.language == langCode }
+                    if (fallbackVoice != null) {
+                        tts?.voice = fallbackVoice
+                    }
                 }
             } else {
                 val langCode = if (isSpanish) "es" else "en"
                 val bestVoice = tts?.voices?.firstOrNull {
-                    it.locale.language == langCode && it.name.contains("male", ignoreCase = true)
+                    it.locale.language == langCode && (it.name.contains("male", ignoreCase = true) || it.name.contains("natural", ignoreCase = true))
                 } ?: tts?.voices?.firstOrNull {
                     it.locale.language == langCode
                 } ?: tts?.voices?.firstOrNull()

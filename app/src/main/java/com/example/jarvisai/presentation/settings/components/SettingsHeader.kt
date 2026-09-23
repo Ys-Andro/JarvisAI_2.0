@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VolumeUp
@@ -180,7 +181,7 @@ fun SettingsHeader(
                 )
 
                 TelemetryStatCard(
-                    icon = Icons.Default.VolumeUp,
+                    icon = Icons.AutoMirrored.Filled.VolumeUp,
                     label = "VOZ AUTOMÁTICA",
                     value = if (uiState.settings.autoTts) "Habilitada" else "Manual",
                     highlightColor = if (uiState.settings.autoTts) JarvisAccentGreen else JarvisTextSecondary,

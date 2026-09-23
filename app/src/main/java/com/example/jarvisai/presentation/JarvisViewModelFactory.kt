@@ -24,7 +24,8 @@ class JarvisViewModelFactory(
                     inferenceRepository = appContainer.inferenceRepository,
                     settingsRepository = appContainer.settingsRepository,
                     ttsRepository = appContainer.ttsRepository,
-                    documentRepository = appContainer.documentRepository
+                    documentRepository = appContainer.documentRepository,
+                    liveVoiceEngine = appContainer.liveVoiceEngine
                 ) as T
             }
             modelClass.isAssignableFrom(LibraryViewModel::class.java) -> {

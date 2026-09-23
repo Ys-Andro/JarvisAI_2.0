@@ -87,4 +87,8 @@ class AppContainer(private val context: Context) {
     val ttsRepository: ITtsRepository by lazy {
         AndroidTtsRepository(context, settingsRepository)
     }
+
+    val liveVoiceEngine: com.example.jarvisai.domain.voice.ILiveVoiceEngine by lazy {
+        com.example.jarvisai.data.voice.AndroidLiveVoiceEngine(context, ttsRepository, settingsRepository)
+    }
 }

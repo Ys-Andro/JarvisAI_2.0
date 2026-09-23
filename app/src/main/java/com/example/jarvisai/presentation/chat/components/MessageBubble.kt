@@ -24,13 +24,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,10 +56,14 @@ import com.example.jarvisai.ui.theme.JarvisAssistantBubble
 import com.example.jarvisai.ui.theme.JarvisBorder
 import com.example.jarvisai.ui.theme.JarvisBorderGlow
 import com.example.jarvisai.ui.theme.JarvisPrimary
+import com.example.jarvisai.ui.theme.JarvisPrimaryLight
+import com.example.jarvisai.ui.theme.JarvisSurfaceElevated
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
+import com.example.jarvisai.ui.theme.JarvisTextTertiary
 import com.example.jarvisai.ui.theme.JarvisUserBubble
 import com.example.jarvisai.ui.theme.JarvisUserBubbleEnd
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,8 +78,17 @@ fun MessageBubble(
 ) {
     val isUser = message.role == Role.USER
     val clipboardManager = LocalClipboardManager.current
+    var isCopied by remember { mutableStateOf(false) }
+
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     val formattedTime = timeFormat.format(Date(message.timestamp))
+
+    LaunchedEffect(isCopied) {
+        if (isCopied) {
+            delay(2000)
+            isCopied = false
+        }
+    }
 
     Row(
         modifier = modifier
@@ -77,31 +97,38 @@ fun MessageBubble(
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         if (!isUser) {
-            // Assistant Avatar indicator
+            // High-tech Jarvis Reactor Avatar
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
-                    .background(Brush.radialGradient(listOf(JarvisPrimary, Color(0xFF0288D1))))
-                    .border(1.dp, JarvisBorderGlow, CircleShape),
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                JarvisPrimary.copy(alpha = 0.8f),
+                                Color(0xFF005662),
+                                Color(0xFF07090F)
+                            )
+                        )
+                    )
+                    .border(1.dp, JarvisPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "J",
-                    color = Color(0xFF001F28),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                Icon(
+                    imageVector = Icons.Default.Memory,
+                    contentDescription = "Jarvis Core",
+                    tint = Color(0xFFE0F7FA),
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
         }
 
         Column(
-            modifier = Modifier.widthIn(max = 320.dp),
+            modifier = Modifier.widthIn(max = 330.dp),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            // Bubble Surface
+            // Bubble Surface Container
             Box(
                 modifier = Modifier
                     .clip(
@@ -114,20 +141,74 @@ fun MessageBubble(
                     )
                     .then(
                         if (isUser) {
-                            Modifier.background(
-                                Brush.linearGradient(
-                                    listOf(JarvisUserBubble, JarvisUserBubbleEnd)
+                            Modifier
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            JarvisUserBubble,
+                                            JarvisUserBubbleEnd
+                                        )
+                                    )
                                 )
-                            )
+                                .border(
+                                    1.dp,
+                                    Color(0xFF42A5F5).copy(alpha = 0.4f),
+                                    RoundedCornerShape(
+                                        topStart = 16.dp,
+                                        topEnd = 16.dp,
+                                        bottomStart = 16.dp,
+                                        bottomEnd = 4.dp
+                                    )
+                                )
                         } else {
                             Modifier
-                                .background(JarvisAssistantBubble)
-                                .border(1.dp, JarvisBorder, RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            JarvisSurfaceElevated,
+                                            JarvisAssistantBubble
+                                        )
+                                    )
+                                )
+                                .border(
+                                    1.dp,
+                                    JarvisBorder,
+                                    RoundedCornerShape(
+                                        topStart = 16.dp,
+                                        topEnd = 16.dp,
+                                        bottomStart = 4.dp,
+                                        bottomEnd = 16.dp
+                                    )
+                                )
                         }
                     )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 14.dp, vertical = 11.dp)
             ) {
                 Column {
+                    // Assistant micro-HUD header
+                    if (!isUser) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(JarvisPrimary)
+                            )
+                            Text(
+                                text = "JARVIS NEURAL CORE",
+                                color = JarvisPrimary,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                    }
+
                     // Multimodal Attached Image if present
                     if (!message.imageUri.isNullOrBlank()) {
                         coil.compose.AsyncImage(
@@ -137,27 +218,34 @@ fun MessageBubble(
                                 .fillMaxWidth()
                                 .height(180.dp)
                                 .clip(RoundedCornerShape(10.dp))
+                                .border(1.dp, JarvisBorder, RoundedCornerShape(10.dp))
                                 .padding(bottom = 8.dp),
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop
                         )
                     }
 
+                    // Message Content or Streaming Dots
                     if (message.content.isEmpty() && message.isStreaming) {
                         GeneratingDotsIndicator()
                     } else {
                         SimpleMarkdownText(
                             content = message.content,
-                            textColor = if (isUser) Color.White else JarvisTextPrimary,
+                            textColor = if (isUser) Color(0xFFF9FBFD) else JarvisTextPrimary,
                             fontSize = 15
                         )
                     }
 
                     // Telemetry & metrics for Assistant answers
                     if (!isUser && !message.isStreaming && message.tokensPerSecond > 0f) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF080D18))
+                                .border(1.dp, JarvisBorder, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -167,15 +255,16 @@ fun MessageBubble(
                             )
                             Text(
                                 text = String.format("%.1f tok/s", message.tokensPerSecond),
-                                color = JarvisPrimary,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace
+                                color = JarvisAccentGreen,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
                             )
                             if (message.generationDurationMs > 0) {
                                 Text(
-                                    text = "• ${message.generationDurationMs / 1000f}s",
+                                    text = "• ${String.format("%.2f", message.generationDurationMs / 1000f)}s",
                                     color = JarvisTextSecondary,
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
@@ -184,52 +273,80 @@ fun MessageBubble(
                 }
             }
 
-            // Bottom actions (Timestamp, Copy, TTS)
+            // Bottom action row (Timestamp, Copy status, Read aloud)
             Row(
                 modifier = Modifier
-                    .padding(top = 2.dp, start = 4.dp, end = 4.dp),
+                    .padding(top = 4.dp, start = 4.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = formattedTime,
-                    color = JarvisTextSecondary.copy(alpha = 0.7f),
+                    color = JarvisTextTertiary,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace
                 )
 
                 if (!isUser && message.content.isNotBlank()) {
-                    // Copy action
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copy message",
-                        tint = JarvisTextSecondary.copy(alpha = 0.7f),
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clickable {
-                                clipboardManager.setText(AnnotatedString(message.content))
+                    // Copy action button
+                    Surface(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(message.content))
+                            isCopied = true
+                        },
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color.Transparent
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                contentDescription = "Copiar mensaje",
+                                tint = if (isCopied) JarvisAccentGreen else JarvisTextSecondary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            if (isCopied) {
+                                Text(
+                                    text = "Copiado",
+                                    color = JarvisAccentGreen,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
                             }
-                    )
+                        }
+                    }
 
-                    // Text-To-Speech action
-                    if (isSpeaking) {
-                        Icon(
-                            imageVector = Icons.Default.Stop,
-                            contentDescription = "Stop reading",
-                            tint = JarvisPrimary,
-                            modifier = Modifier
-                                .size(16.dp)
-                                .clickable { onStopSpeakClick() }
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = "Read aloud",
-                            tint = JarvisTextSecondary.copy(alpha = 0.7f),
-                            modifier = Modifier
-                                .size(15.dp)
-                                .clickable { onSpeakClick(message.content) }
-                        )
+                    // TTS Voice synthesis button
+                    Surface(
+                        onClick = {
+                            if (isSpeaking) onStopSpeakClick() else onSpeakClick(message.content)
+                        },
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (isSpeaking) JarvisPrimary.copy(alpha = 0.15f) else Color.Transparent
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isSpeaking) Icons.Default.GraphicEq else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = if (isSpeaking) "Detener audio" else "Escuchar",
+                                tint = if (isSpeaking) JarvisPrimary else JarvisTextSecondary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            if (isSpeaking) {
+                                Text(
+                                    text = "Hablando...",
+                                    color = JarvisPrimary,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -244,7 +361,7 @@ fun GeneratingDotsIndicator(modifier: Modifier = Modifier) {
         initialValue = 0.2f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = FastOutSlowInEasing),
+            animation = tween(500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "dot1"
@@ -253,7 +370,7 @@ fun GeneratingDotsIndicator(modifier: Modifier = Modifier) {
         initialValue = 0.2f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(600, delayMillis = 200, easing = FastOutSlowInEasing),
+            animation = tween(500, delayMillis = 180, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "dot2"
@@ -262,7 +379,7 @@ fun GeneratingDotsIndicator(modifier: Modifier = Modifier) {
         initialValue = 0.2f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(600, delayMillis = 400, easing = FastOutSlowInEasing),
+            animation = tween(500, delayMillis = 360, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "dot3"
@@ -293,10 +410,11 @@ fun GeneratingDotsIndicator(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = "Jarvis procesando...",
-            color = JarvisTextSecondary,
+            text = "Jarvis procesando señal...",
+            color = JarvisPrimaryLight,
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace
         )
     }
 }
+
