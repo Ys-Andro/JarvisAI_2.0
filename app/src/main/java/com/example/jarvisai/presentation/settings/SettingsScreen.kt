@@ -1,10 +1,12 @@
 package com.example.jarvisai.presentation.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,60 +21,62 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.jarvisai.domain.model.AppThemeMode
+import com.example.jarvisai.domain.model.GenerationSettings
 import com.example.jarvisai.presentation.models.ModelsViewModel
+import com.example.jarvisai.presentation.settings.components.AgentSelectorSection
+import com.example.jarvisai.presentation.settings.components.GenerationParamsSection
+import com.example.jarvisai.presentation.settings.components.MemoryDocsSection
+import com.example.jarvisai.presentation.settings.components.ProviderApiKeySection
+import com.example.jarvisai.presentation.settings.components.SettingsCategory
+import com.example.jarvisai.presentation.settings.components.SettingsCategoryTabs
+import com.example.jarvisai.presentation.settings.components.SettingsHeader
+import com.example.jarvisai.presentation.settings.components.SettingsSectionCard
+import com.example.jarvisai.presentation.settings.components.VoiceSettingsSection
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
+import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBackground
 import com.example.jarvisai.ui.theme.JarvisBorder
-import com.example.jarvisai.ui.theme.JarvisBorderGlow
 import com.example.jarvisai.ui.theme.JarvisPrimary
+import com.example.jarvisai.ui.theme.JarvisPrimaryLight
 import com.example.jarvisai.ui.theme.JarvisSurface
+import com.example.jarvisai.ui.theme.JarvisSurfaceElevated
 import com.example.jarvisai.ui.theme.JarvisSurfaceVariant
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
-import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -83,21 +87,17 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val settings = uiState.settings
-    var apiKeyInput by remember(uiState.apiKey) { mutableStateOf(uiState.apiKey ?: "") }
-    
-    // All sections collapsed by default when entering Settings
-    var isApiKeysExpanded by remember { mutableStateOf(false) }
-    var isMemoryExpanded by remember { mutableStateOf(false) }
-    var isAgentExpanded by remember { mutableStateOf(false) }
-    var isDocumentsExpanded by remember { mutableStateOf(false) }
-    var isGenParamsExpanded by remember { mutableStateOf(false) }
-    var isSystemPromptExpanded by remember { mutableStateOf(false) }
-    var isTtsExpanded by remember { mutableStateOf(false) }
-    var isThemeExpanded by remember { mutableStateOf(false) }
-    var isBubbleExpanded by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
-    val context = LocalContext.current
+    var selectedCategory by remember { mutableStateOf(SettingsCategory.ALL) }
+
+    var isApiKeysExpanded by remember { mutableStateOf(true) }
+    var isAgentExpanded by remember { mutableStateOf(true) }
+    var isGenParamsExpanded by remember { mutableStateOf(true) }
+    var isVoiceExpanded by remember { mutableStateOf(true) }
+    var isMemoryExpanded by remember { mutableStateOf(true) }
+    var isThemeExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier
@@ -105,896 +105,363 @@ fun SettingsScreen(
             .background(JarvisBackground),
         containerColor = JarvisBackground,
         topBar = {
-            SettingsTopBar(onBackClick = onBackClick)
+            ModernSettingsTopBar(
+                onBackClick = onBackClick
+            )
         }
     ) { innerPadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding)
         ) {
-            // Section -1.5: Floating Bubble
-            item {
-                SettingsSectionCard(
-                    title = "MODO FLOTANTE (JARVIS BUBBLE)",
-                    icon = Icons.Default.SmartToy,
-                    isCollapsible = true,
-                    isExpanded = isBubbleExpanded,
-                    onToggleExpand = { isBubbleExpanded = !isBubbleExpanded }
-                ) {
-                    Text(
-                        text = "Activa una burbuja flotante para acceder a Jarvis y al Mini Chat desde cualquier aplicación. Requiere permiso de superposición.",
-                        color = JarvisTextSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Button(
-                        onClick = {
-                            if (android.provider.Settings.canDrawOverlays(context)) {
-                                val intent = android.content.Intent(context, com.example.jarvisai.presentation.bubble.JarvisBubbleService::class.java)
-                                context.startService(intent)
-                            } else {
-                                val intent = android.content.Intent(
-                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    android.net.Uri.parse("package:${context.packageName}")
-                                )
-                                context.startActivity(intent)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header HUD telemetry summary
+                item {
+                    SettingsHeader(uiState = uiState)
+                }
+
+                // Category Tabs Filter
+                item {
+                    SettingsCategoryTabs(
+                        selectedCategory = selectedCategory,
+                        onSelectCategory = { category ->
+                            selectedCategory = category
+                            scope.launch {
+                                listState.animateScrollToItem(0)
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            text = "ACTIVAR BURBUJA FLOTANTE",
-                            color = JarvisBackground,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            val intent = android.content.Intent(context, com.example.jarvisai.presentation.bubble.JarvisBubbleService::class.java)
-                            context.stopService(intent)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = JarvisSurfaceVariant),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            text = "DESACTIVAR BURBUJA",
-                            color = JarvisPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-
-            // Section -1: Long-term Memory
-            item {
-                SettingsSectionCard(
-                    title = "MEMORIA A LARGO PLAZO",
-                    icon = Icons.Default.SmartToy,
-                    isCollapsible = true,
-                    isExpanded = isMemoryExpanded,
-                    onToggleExpand = { isMemoryExpanded = !isMemoryExpanded }
-                ) {
-                    Text(
-                        text = "Jarvis recuerda información importante del usuario (nombre, preferencias, proyectos) entre distintas conversaciones y la integra automáticamente.",
-                        color = JarvisTextSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
+                        }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onNavigateToMemory,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            text = "VER Y EDITAR RECUERDOS",
-                            color = JarvisBackground,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
                 }
-            }
 
-            // Section -0.5: Multiple Personalities / Agents
-            item {
-                SettingsSectionCard(
-                    title = "PERSONALIDADES / AGENTES",
-                    icon = Icons.Default.SmartToy,
-                    isCollapsible = true,
-                    isExpanded = isAgentExpanded,
-                    onToggleExpand = { isAgentExpanded = !isAgentExpanded }
-                ) {
-                    Text(
-                        text = "Selecciona la personalidad de Jarvis. Cada agente cuenta con su propio system prompt especializado.",
-                        color = JarvisTextSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                // Section: API Keys & AI Models
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.MODELS_API) {
+                    item {
+                        val activeKeysCount = uiState.providerApiKeys.count { it.value.isNotBlank() } +
+                                (if (!uiState.apiKey.isNullOrBlank()) 1 else 0)
 
-                    val agents = com.example.jarvisai.domain.model.Agent.DEFAULT_AGENTS
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (agent in agents) {
-                            val isSelected = uiState.selectedAgentId == agent.id
-                            AgentOptionCard(
-                                agent = agent,
-                                isSelected = isSelected,
-                                onClick = { viewModel.setSelectedAgent(agent.id) }
+                        SettingsSectionCard(
+                            title = "MODELOS IA & PROVEEDORES",
+                            subtitle = "Configuración de Google Gemini, OpenAI, DeepSeek, Groq, Claude",
+                            icon = Icons.Default.Key,
+                            badgeText = if (activeKeysCount > 0) "$activeKeysCount LLAVES" else "PENDIENTE",
+                            badgeColor = if (activeKeysCount > 0) JarvisAccentGreen else JarvisAccentRed,
+                            isExpanded = isApiKeysExpanded,
+                            onToggleExpand = { isApiKeysExpanded = !isApiKeysExpanded }
+                        ) {
+                            ProviderApiKeySection(
+                                uiState = uiState,
+                                onSaveGeminiKey = { key -> viewModel.updateApiKey(key) },
+                                onSaveProviderKey = { provider, key -> viewModel.updateProviderApiKey(provider, key) },
+                                onSaveCustomEndpoint = { endpoint -> viewModel.updateCustomOpenAiEndpoint(endpoint) },
+                                onSelectModel = { modelId -> viewModel.updateSelectedGeminiModel(modelId) },
+                                onVerifyKey = { provider, key -> viewModel.verifyApiKey(provider, key) }
                             )
                         }
                     }
                 }
-            }
 
-            // Section -0.2: Analyzed Documents
-            item {
-                SettingsSectionCard(
-                    title = "DOCUMENTOS ANALIZADOS",
-                    icon = Icons.Default.Description,
-                    isCollapsible = true,
-                    isExpanded = isDocumentsExpanded,
-                    onToggleExpand = { isDocumentsExpanded = !isDocumentsExpanded }
-                ) {
-                    Text(
-                        text = "Consulta y lee los documentos PDF, TXT y DOCX analizados por Jarvis. Disponibles tanto con internet como en modo offline.",
-                        color = JarvisTextSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onNavigateToDocuments,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            text = "VER DOCUMENTOS ANALIZADOS",
-                            color = JarvisBackground,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                // Section: Personalities & Agents
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.AGENTS) {
+                    item {
+                        val currentAgent = com.example.jarvisai.domain.model.Agent.findById(uiState.selectedAgentId)
+                        SettingsSectionCard(
+                            title = "PERSONALIDAD & AGENTE",
+                            subtitle = "Define el rol, tono y estilo de respuesta de Jarvis",
+                            icon = Icons.Default.SmartToy,
+                            badgeText = currentAgent.name.uppercase(),
+                            badgeColor = JarvisPrimary,
+                            isExpanded = isAgentExpanded,
+                            onToggleExpand = { isAgentExpanded = !isAgentExpanded }
+                        ) {
+                            AgentSelectorSection(
+                                selectedAgentId = uiState.selectedAgentId,
+                                onSelectAgent = { agentId -> viewModel.setSelectedAgent(agentId) }
+                            )
+                        }
                     }
                 }
-            }
 
-            // Section 0: Multi-provider API Keys & Model Configuration
-            item {
-                SettingsSectionCard(
-                    title = "CLAVES API POR PROVEEDOR",
-                    icon = Icons.Default.Key,
-                    isCollapsible = true,
-                    isExpanded = isApiKeysExpanded,
-                    onToggleExpand = { isApiKeysExpanded = !isApiKeysExpanded }
-                ) {
-                    Text(
-                        text = "Configura de manera independiente las API Keys para cada proveedor (Gemini, OpenAI, DeepSeek, Groq, Anthropic). Cada proveedor almacena su clave de forma segura y aislada.",
-                        color = JarvisTextSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                // Section: Generation Parameters
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.PARAMETERS) {
+                    item {
+                        SettingsSectionCard(
+                            title = "PARÁMETROS DE GENERACIÓN",
+                            subtitle = "Ajusta temperatura, nucleus sampling (Top-P) y prompt base",
+                            icon = Icons.Default.Tune,
+                            badgeText = "TEMP: ${String.format("%.2f", uiState.settings.temperature)}",
+                            badgeColor = JarvisPrimaryLight,
+                            isExpanded = isGenParamsExpanded,
+                            onToggleExpand = { isGenParamsExpanded = !isGenParamsExpanded }
+                        ) {
+                            GenerationParamsSection(
+                                settings = uiState.settings,
+                                onUpdateTemperature = { viewModel.updateTemperature(it) },
+                                onUpdateTopP = { viewModel.updateTopP(it) },
+                                onUpdateTopK = { viewModel.updateTopK(it) },
+                                onUpdateSystemPrompt = { viewModel.updateSystemPrompt(it) },
+                                onResetDefaults = {
+                                    viewModel.updateSettings(GenerationSettings())
+                                }
+                            )
+                        }
+                    }
+                }
 
-                    val providers = listOf(
-                        Triple("gemini", "Google Gemini", "AIzaSy... (o usa .env)"),
-                        Triple("openrouter", "OpenRouter", "sk-or-v1-..."),
-                        Triple("openai", "OpenAI", "sk-proj-..."),
-                        Triple("deepseek", "DeepSeek", "sk-..."),
-                        Triple("groq", "Groq Cloud", "gsk_..."),
-                        Triple("anthropic", "Anthropic Claude", "sk-ant-api...")
-                    )
+                // Section: Voice & TTS
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.VOICE) {
+                    item {
+                        SettingsSectionCard(
+                            title = "SÍNTESIS DE VOZ (TTS)",
+                            subtitle = "Motor de síntesis vocal nativo con tono grave Jarvis",
+                            icon = Icons.Default.RecordVoiceOver,
+                            badgeText = if (uiState.settings.autoTts) "AUTO-VOZ ON" else "MANUAL",
+                            badgeColor = if (uiState.settings.autoTts) JarvisAccentGreen else JarvisTextSecondary,
+                            isExpanded = isVoiceExpanded,
+                            onToggleExpand = { isVoiceExpanded = !isVoiceExpanded }
+                        ) {
+                            VoiceSettingsSection(
+                                settings = uiState.settings,
+                                onUpdateAutoTts = { viewModel.updateAutoTts(it) },
+                                onUpdateVoiceName = { viewModel.updateAndroidVoiceName(it) },
+                                onUpdateSpeed = { viewModel.updateTtsSpeed(it) },
+                                onUpdatePitch = { viewModel.updateTtsPitch(it) },
+                                onTestVoice = { viewModel.testVoice() }
+                            )
+                        }
+                    }
+                }
 
-                    var selectedProviderTab by remember { mutableStateOf("gemini") }
+                // Section: Long Term Memory & Analyzed Docs
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.DATA) {
+                    item {
+                        SettingsSectionCard(
+                            title = "CONOCIMIENTO & MEMORIA",
+                            subtitle = "Recuerdos del usuario e indexación de archivos",
+                            icon = Icons.Default.Description,
+                            badgeText = "ACTIVO",
+                            badgeColor = JarvisPrimary,
+                            isExpanded = isMemoryExpanded,
+                            onToggleExpand = { isMemoryExpanded = !isMemoryExpanded }
+                        ) {
+                            MemoryDocsSection(
+                                onNavigateToMemory = onNavigateToMemory,
+                                onNavigateToDocuments = onNavigateToDocuments
+                            )
+                        }
+                    }
+                }
 
-                    // Provider Tabs
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        providers.forEach { (pId, pName, _) ->
-                            val isCurrentTab = selectedProviderTab == pId
-                            val hasKey = !uiState.providerApiKeys[pId].isNullOrBlank() || (pId == "gemini" && !uiState.apiKey.isNullOrBlank())
-                            val tabLabel = when (pId) {
-                                "openrouter" -> "OpenRouter"
-                                "anthropic" -> "Claude"
-                                "gemini" -> "Gemini"
-                                "openai" -> "OpenAI"
-                                "deepseek" -> "DeepSeek"
-                                "groq" -> "Groq"
-                                else -> pName.split(" ").last()
-                            }
-
-                            Surface(
+                // Section: Appearance & Theme
+                if (selectedCategory == SettingsCategory.ALL) {
+                    item {
+                        SettingsSectionCard(
+                            title = "APARIENCIA & INTERFAZ",
+                            subtitle = "Estilo visual HUD y paleta de colores",
+                            icon = Icons.Default.Palette,
+                            badgeText = "JARVIS DARK",
+                            badgeColor = JarvisPrimary,
+                            isExpanded = isThemeExpanded,
+                            onToggleExpand = { isThemeExpanded = !isThemeExpanded }
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { selectedProviderTab = pId }
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isCurrentTab) JarvisPrimary else JarvisBorder,
-                                        shape = RoundedCornerShape(8.dp)
-                                    ),
-                                color = if (isCurrentTab) JarvisPrimary.copy(alpha = 0.2f) else JarvisSurfaceVariant
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(JarvisPrimary.copy(alpha = 0.12f))
+                                    .border(1.dp, JarvisPrimary, RoundedCornerShape(12.dp))
+                                    .padding(14.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(
-                                        text = tabLabel,
-                                        color = if (isCurrentTab) JarvisPrimary else JarvisTextPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    if (hasKey) {
+                                    Column {
                                         Text(
-                                            text = "●",
+                                            text = "Jarvis Dark (Cian Holográfico)",
+                                            color = JarvisPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Paleta optimizada para pantallas OLED con estética futurista de alta fidelidad.",
+                                            color = JarvisTextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Surface(
+                                        color = JarvisAccentGreen.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(4.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentGreen)
+                                    ) {
+                                        Text(
+                                            text = "ACTIVO",
                                             color = JarvisAccentGreen,
-                                            fontSize = 10.sp
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
                                 }
                             }
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val currentProvider = providers.firstOrNull { it.first == selectedProviderTab } ?: providers[0]
-                    val currentKeyValue = when (selectedProviderTab) {
-                        "gemini" -> apiKeyInput
-                        else -> uiState.providerApiKeys[selectedProviderTab] ?: ""
-                    }
-                    var providerInputState by remember(selectedProviderTab, currentKeyValue) {
-                        mutableStateOf(currentKeyValue)
-                    }
-
-                    Text(
-                        text = "API KEY PARA ${currentProvider.second.uppercase()}",
-                        color = JarvisPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = providerInputState,
-                        onValueChange = { providerInputState = it },
-                        placeholder = {
-                            Text(
-                                text = "Ej: ${currentProvider.third}",
-                                color = JarvisTextSecondary.copy(alpha = 0.5f),
-                                fontSize = 12.sp
-                            )
-                        },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = JarvisPrimary,
-                            unfocusedBorderColor = JarvisBorder,
-                            focusedTextColor = JarvisTextPrimary,
-                            unfocusedTextColor = JarvisTextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            val trimmed = providerInputState.trim()
-                            if (selectedProviderTab == "gemini") {
-                                apiKeyInput = trimmed
-                                viewModel.updateApiKey(trimmed)
-                            } else {
-                                viewModel.updateProviderApiKey(selectedProviderTab, trimmed)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "GUARDAR CLAVE DE ${currentProvider.second.uppercase()}",
-                            color = JarvisBackground,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
-                    }
-
-                    if (currentProvider.first == "openai") {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        var customEndpointInput by remember(uiState.customOpenAiEndpoint) {
-                            mutableStateOf(uiState.customOpenAiEndpoint ?: "")
-                        }
-                        Text(
-                            text = "ENDPOINT PERSONALIZADO (OPCIONAL)",
-                            color = JarvisTextSecondary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = customEndpointInput,
-                            onValueChange = { customEndpointInput = it },
-                            placeholder = {
-                                Text(
-                                    text = "https://api.openai.com/v1 (o servidor local)",
-                                    color = JarvisTextSecondary.copy(alpha = 0.5f),
-                                    fontSize = 11.sp
-                                )
-                            },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = JarvisPrimary,
-                                unfocusedBorderColor = JarvisBorder,
-                                focusedTextColor = JarvisTextPrimary,
-                                unfocusedTextColor = JarvisTextPrimary
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Button(
-                            onClick = { viewModel.updateCustomOpenAiEndpoint(customEndpointInput.trim()) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = JarvisSurfaceVariant,
-                                contentColor = JarvisPrimary
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "GUARDAR ENDPOINT",
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "MODELO DE INTELIGENCIA ARTIFICIAL",
-                        color = JarvisTextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    com.example.jarvisai.domain.model.CloudAiModel.ALL_MODELS.forEach { model ->
-                        val isSelected = uiState.selectedGeminiModel == model.id
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSelected) JarvisPrimary.copy(alpha = 0.15f) else JarvisSurfaceVariant)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) JarvisPrimary else JarvisBorder,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .clickable { viewModel.updateSelectedGeminiModel(model.id) }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = model.name,
-                                        color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text(
-                                        text = "[${model.provider.displayName}]",
-                                        color = JarvisPrimary.copy(alpha = 0.8f),
-                                        fontSize = 10.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                                Text(
-                                    text = model.description,
-                                    color = JarvisTextSecondary,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            if (isSelected) {
-                                Text(
-                                    text = "ACTIVO",
-                                    color = JarvisAccentGreen,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-                    }
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
 
-            // Section 1: Inferencia & Parámetros LLM
-            item {
-                SettingsSectionCard(
-                    title = "PARÁMETROS DE GENERACIÓN",
-                    icon = Icons.Default.Tune,
-                    isCollapsible = true,
-                    isExpanded = isGenParamsExpanded,
-                    onToggleExpand = { isGenParamsExpanded = !isGenParamsExpanded }
-                ) {
-                    // Temperature
-                    SliderSettingRow(
-                        label = "Temperatura (Creatividad)",
-                        valueText = String.format("%.2f", settings.temperature),
-                        value = settings.temperature,
-                        onValueChange = { viewModel.updateTemperature(it) },
-                        valueRange = 0.0f..1.5f,
-                        steps = 14
-                    )
+            // Floating Status / Feedback Toast Banner at Bottom
+            AnimatedVisibility(
+                visible = uiState.statusMessage != null || uiState.errorMessage != null,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+            ) {
+                val isError = uiState.errorMessage != null
+                val messageText = uiState.errorMessage ?: uiState.statusMessage ?: ""
+                val accentColor = if (isError) JarvisAccentRed else JarvisAccentGreen
 
-                    // Top-P
-                    SliderSettingRow(
-                        label = "Top-P (Nucleus Sampling)",
-                        valueText = String.format("%.2f", settings.topP),
-                        value = settings.topP,
-                        onValueChange = { viewModel.updateTopP(it) },
-                        valueRange = 0.1f..1.0f,
-                        steps = 8
-                    )
-
-                    // Top-K
-                    SliderSettingRow(
-                        label = "Top-K",
-                        valueText = "${settings.topK}",
-                        value = settings.topK.toFloat(),
-                        onValueChange = { viewModel.updateTopK(it.roundToInt()) },
-                        valueRange = 1f..100f,
-                        steps = 98
-                    )
-                }
-            }
-
-            // Section 2: System Prompt
-            item {
-                SettingsSectionCard(
-                    title = "PERSONALIDAD & SYSTEM PROMPT",
-                    icon = Icons.Default.Info,
-                    isCollapsible = true,
-                    isExpanded = isSystemPromptExpanded,
-                    onToggleExpand = { isSystemPromptExpanded = !isSystemPromptExpanded }
-                ) {
-                    Text(
-                        text = "Define la directiva inicial que modela el comportamiento de Jarvis.",
-                        color = JarvisTextSecondary,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = settings.systemPrompt,
-                        onValueChange = { viewModel.updateSystemPrompt(it) },
-                        minLines = 3,
-                        maxLines = 6,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = JarvisPrimary,
-                            unfocusedBorderColor = JarvisBorder,
-                            focusedTextColor = JarvisTextPrimary,
-                            unfocusedTextColor = JarvisTextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            // Section 3: Text to Speech (Android TTS only)
-            item {
-                SettingsSectionCard(
-                    title = "SÍNTESIS DE VOZ (TTS)",
-                    icon = Icons.Default.RecordVoiceOver,
-                    isCollapsible = true,
-                    isExpanded = isTtsExpanded,
-                    onToggleExpand = { isTtsExpanded = !isTtsExpanded }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(JarvisSurfaceElevated)
+                        .border(1.dp, accentColor, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Lectura automática",
-                                color = JarvisTextPrimary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Leer en voz alta cada respuesta completada.",
-                                color = JarvisTextSecondary,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Switch(
-                            checked = settings.autoTts,
-                            onCheckedChange = { viewModel.updateAutoTts(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF001F28),
-                                checkedTrackColor = JarvisPrimary,
-                                uncheckedThumbColor = JarvisTextSecondary,
-                                uncheckedTrackColor = JarvisSurfaceVariant
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "VOZ DE ANDROID (ESTILO JARVIS)",
-                        color = JarvisPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Tono grave y asistente optimizado por defecto",
-                        color = JarvisTextSecondary,
-                        fontSize = 11.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val androidVoiceOptions = listOf(
-                        Pair("", "Predeterminado (Automático - Masculino / Grave)"),
-                        Pair("en-us-x-sfg#male_1-local", "Inglés US - Masculino 1"),
-                        Pair("en-gb-x-rjs#male_1-local", "Inglés UK - Británico Jarvis"),
-                        Pair("es-es-x-eee#male_1-local", "Español - Masculino Asistente")
-                    )
-
-                    androidVoiceOptions.forEach { (voiceId, voiceName) ->
-                        val isSelectedVoice = settings.androidVoiceName == voiceId
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 3.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelectedVoice) JarvisPrimary.copy(alpha = 0.12f) else JarvisSurfaceVariant)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelectedVoice) JarvisPrimary else JarvisBorder,
-                                    shape = RoundedCornerShape(6.dp)
-                                )
-                                .clickable { viewModel.updateAndroidVoiceName(voiceId) }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.weight(1f)
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(accentColor)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = voiceName,
-                                color = if (isSelectedVoice) JarvisPrimary else JarvisTextPrimary,
+                                text = messageText,
+                                color = JarvisTextPrimary,
                                 fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
                                 fontFamily = FontFamily.Monospace
                             )
-                            if (isSelectedVoice) {
-                                Text(
-                                    text = "✓",
-                                    color = JarvisAccentGreen,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    SliderSettingRow(
-                        label = "Velocidad de voz",
-                        valueText = String.format("%.2fx", settings.ttsSpeed),
-                        value = settings.ttsSpeed,
-                        onValueChange = { viewModel.updateTtsSpeed(it) },
-                        valueRange = 0.5f..2.0f,
-                        steps = 15
-                    )
-
-                    SliderSettingRow(
-                        label = "Tono de voz (Pitch)",
-                        valueText = String.format("%.2fx", settings.ttsPitch),
-                        value = settings.ttsPitch,
-                        onValueChange = { viewModel.updateTtsPitch(it) },
-                        valueRange = 0.5f..1.5f,
-                        steps = 10
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Button(
-                        onClick = { viewModel.testVoice() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag("test_voice_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = JarvisPrimary,
-                            contentColor = Color(0xFF001F28)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "🔊 Probar voz actual",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-
-            // Section 4: Theme Mode
-            item {
-                SettingsSectionCard(
-                    title = "APARIENCIA & TEMA",
-                    icon = Icons.Default.Palette,
-                    isCollapsible = true,
-                    isExpanded = isThemeExpanded,
-                    onToggleExpand = { isThemeExpanded = !isThemeExpanded }
-                ) {
-                    val themes = listOf(
-                        AppThemeMode.DARK_JARVIS to "Jarvis Dark (Cian Holográfico)"
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        themes.forEach { (mode, name) ->
-                            val isSelectedTheme = uiState.appTheme == mode
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelectedTheme) JarvisPrimary.copy(alpha = 0.15f) else JarvisSurfaceVariant)
-                                    .border(1.dp, if (isSelectedTheme) JarvisPrimary else JarvisBorder, RoundedCornerShape(8.dp))
-                                    .clickable { viewModel.setAppTheme(mode) }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = name,
-                                    color = if (isSelectedTheme) JarvisPrimary else JarvisTextPrimary,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                                if (isSelectedTheme) {
-                                    Text(
-                                        text = "ACTIVO",
-                                        color = JarvisAccentGreen,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
+                        IconButton(
+                            onClick = { viewModel.dismissMessage() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cerrar",
+                                tint = JarvisTextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
             }
-
         }
     }
 }
 
 @Composable
-private fun SettingsTopBar(
+private fun ModernSettingsTopBar(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .background(JarvisSurface)
-            .border(width = 1.dp, color = JarvisBorder)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Volver",
-                tint = JarvisTextPrimary
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        JarvisSurfaceElevated,
+                        JarvisSurface
+                    )
+                )
             )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "AJUSTES DE JARVIS",
-            color = JarvisTextPrimary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.sp
-        )
-    }
-}
-
-@Composable
-private fun SettingsSectionCard(
-    title: String,
-    icon: ImageVector,
-    isCollapsible: Boolean = false,
-    isExpanded: Boolean = true,
-    onToggleExpand: (() -> Unit)? = null,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(JarvisSurface)
-            .border(1.dp, JarvisBorder, RoundedCornerShape(16.dp))
-            .padding(16.dp)
+            .border(width = 1.dp, color = JarvisBorder)
+            .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (isCollapsible && onToggleExpand != null) {
-                            Modifier.clickable { onToggleExpand() }
-                        } else Modifier
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(JarvisSurfaceVariant)
+                        .border(1.dp, JarvisBorder, RoundedCornerShape(10.dp))
+                        .testTag("settings_back_button")
+                ) {
                     Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = JarvisPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = title,
-                        color = JarvisTextPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.sp
-                    )
-                }
-                if (isCollapsible && onToggleExpand != null) {
-                    Icon(
-                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Contraer" else "Expandir",
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Volver",
                         tint = JarvisPrimary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
-            }
-            if (isExpanded) {
-                Spacer(modifier = Modifier.height(14.dp))
-                content()
-            }
-        }
-    }
-}
 
-@Composable
-private fun SliderSettingRow(
-    label: String,
-    valueText: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int = 0
-) {
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = label,
-                color = JarvisTextSecondary,
-                fontSize = 13.sp
-            )
-            Text(
-                text = valueText,
-                color = JarvisPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-        }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps,
-            colors = SliderDefaults.colors(
-                thumbColor = JarvisPrimary,
-                activeTrackColor = JarvisPrimary,
-                inactiveTrackColor = JarvisSurfaceVariant
-            )
-        )
-    }
-}
+                Spacer(modifier = Modifier.width(12.dp))
 
-@Composable
-private fun AgentOptionCard(
-    agent: com.example.jarvisai.domain.model.Agent,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .border(
-                1.dp,
-                if (isSelected) JarvisPrimary else JarvisBorder,
-                RoundedCornerShape(10.dp)
-            ),
-        color = if (isSelected) JarvisSurfaceVariant else JarvisSurface,
-        shape = RoundedCornerShape(10.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = agent.icon, fontSize = 24.sp)
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = agent.name,
-                    color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-                Text(
-                    text = agent.roleDescription,
-                    color = JarvisTextSecondary,
-                    fontSize = 11.sp
-                )
-            }
-            if (isSelected) {
-                Surface(
-                    color = JarvisPrimary,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
+                Column {
                     Text(
-                        text = "ACTIVO",
-                        color = JarvisBackground,
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
+                        text = "PANEL DE CONTROL",
+                        color = JarvisTextPrimary,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.2.sp
+                    )
+                    Text(
+                        text = "Ajustes del Sistema y Motores IA",
+                        color = JarvisPrimaryLight,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
                     )
                 }
+            }
+
+            Surface(
+                color = JarvisPrimary.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.4f))
+            ) {
+                Text(
+                    text = "CONFIG",
+                    color = JarvisPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
             }
         }
     }
