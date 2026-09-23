@@ -546,6 +546,14 @@ class ChatViewModel(
         _uiState.update { it.copy(errorMessage = null) }
     }
 
+    fun openLiveMode() {
+        _uiState.update { it.copy(isLiveModeRequested = true) }
+    }
+
+    fun dismissLiveMode() {
+        _uiState.update { it.copy(isLiveModeRequested = false) }
+    }
+
     override fun onCleared() {
         super.onCleared()
         generationJob?.cancel()

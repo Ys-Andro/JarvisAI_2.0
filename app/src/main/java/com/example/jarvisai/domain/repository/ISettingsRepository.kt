@@ -20,4 +20,6 @@ interface ISettingsRepository {
     suspend fun setAppTheme(theme: AppThemeMode)
     fun getSelectedAgentId(): Flow<String>
     suspend fun setSelectedAgentId(agentId: String)
+    fun isFloatingBubbleEnabled(): Flow<Boolean>
+    suspend fun setFloatingBubbleEnabled(enabled: Boolean)
 }

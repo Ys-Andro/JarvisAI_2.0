@@ -18,6 +18,7 @@ data class ModelsUiState(
     val settings: GenerationSettings = GenerationSettings(),
     val appTheme: AppThemeMode = AppThemeMode.DARK_JARVIS,
     val availableCpuCores: Int = Runtime.getRuntime().availableProcessors(),
+    val isFloatingBubbleEnabled: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )

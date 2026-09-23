@@ -96,6 +96,13 @@ fun ChatScreen(
 
     var showLiveMode by remember { mutableStateOf(false) }
 
+    LaunchedEffect(uiState.isLiveModeRequested) {
+        if (uiState.isLiveModeRequested) {
+            showLiveMode = true
+            viewModel.dismissLiveMode()
+        }
+    }
+
     // Speech-To-Text launcher
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()

@@ -43,11 +43,10 @@ class AppPreferences(private val context: Context) {
         val AUTO_TTS = booleanPreferencesKey("auto_tts")
         val TTS_SPEED = floatPreferencesKey("tts_speed")
         val TTS_PITCH = floatPreferencesKey("tts_pitch")
-        val TTS_ENGINE = stringPreferencesKey("tts_engine")
-        val FLUX_VOICE = stringPreferencesKey("flux_voice")
         val ANDROID_VOICE_NAME = stringPreferencesKey("android_voice_name")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
+        val FLOATING_BUBBLE_ENABLED = booleanPreferencesKey("floating_bubble_enabled")
     }
 
     private val safePreferences: Flow<Preferences> = dataStore.data
@@ -111,8 +110,6 @@ class AppPreferences(private val context: Context) {
             autoTts = preferences[Keys.AUTO_TTS] ?: false,
             ttsSpeed = preferences[Keys.TTS_SPEED] ?: 1.0f,
             ttsPitch = preferences[Keys.TTS_PITCH] ?: 1.0f,
-            ttsEngine = preferences[Keys.TTS_ENGINE] ?: "android",
-            fluxVoice = preferences[Keys.FLUX_VOICE] ?: "flux-cliff-en",
             androidVoiceName = preferences[Keys.ANDROID_VOICE_NAME] ?: ""
         )
     }
@@ -152,8 +149,6 @@ class AppPreferences(private val context: Context) {
             preferences[Keys.AUTO_TTS] = settings.autoTts
             preferences[Keys.TTS_SPEED] = settings.ttsSpeed
             preferences[Keys.TTS_PITCH] = settings.ttsPitch
-            preferences[Keys.TTS_ENGINE] = settings.ttsEngine
-            preferences[Keys.FLUX_VOICE] = settings.fluxVoice
             preferences[Keys.ANDROID_VOICE_NAME] = settings.androidVoiceName
         }
     }
@@ -248,6 +243,16 @@ class AppPreferences(private val context: Context) {
     suspend fun setSelectedAgentId(agentId: String) {
         dataStore.edit { preferences ->
             preferences[Keys.SELECTED_AGENT_ID] = agentId
+        }
+    }
+
+    val floatingBubbleEnabled: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences[Keys.FLOATING_BUBBLE_ENABLED] ?: false
+    }
+
+    suspend fun setFloatingBubbleEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[Keys.FLOATING_BUBBLE_ENABLED] = enabled
         }
     }
 

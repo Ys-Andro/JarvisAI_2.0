@@ -26,6 +26,7 @@ data class ChatUiState(
     val speakingMessageId: String? = null,
     val streamingMessageId: String? = null,
     val tokensPerSecond: Float = 0f,
+    val isLiveModeRequested: Boolean = false,
     val errorMessage: String? = null
 ) {
     fun isProviderReady(provider: com.example.jarvisai.domain.model.ModelProvider): Boolean {

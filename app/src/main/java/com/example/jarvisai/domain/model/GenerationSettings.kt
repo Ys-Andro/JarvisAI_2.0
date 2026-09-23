@@ -10,8 +10,6 @@ data class GenerationSettings(
     val systemPrompt: String = "You are Jarvis, an intelligent, helpful, and concise AI assistant running completely offline on the user's device.",
     val autoTts: Boolean = false,
     val ttsSpeed: Float = 1.0f,
-    val ttsPitch: Float = 0.85f, // Deep masculine Jarvis pitch by default
-    val ttsEngine: String = "android", // "android" or "openrouter_flux"
-    val fluxVoice: String = "flux-cliff-en", // Default to Cliff (Hombre grave) — estilo Jarvis
+    val ttsPitch: Float = 0.85f, // Deep Jarvis pitch by default
     val androidVoiceName: String = ""
 )

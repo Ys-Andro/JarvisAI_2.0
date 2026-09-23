@@ -48,6 +48,15 @@ class ModelsViewModel(
         observeGeminiModel()
         observeProviderApiKeys()
         observeSelectedAgent()
+        observeFloatingBubble()
+    }
+
+    private fun observeFloatingBubble() {
+        viewModelScope.launch {
+            settingsRepository.isFloatingBubbleEnabled().collect { enabled ->
+                _uiState.update { it.copy(isFloatingBubbleEnabled = enabled) }
+            }
+        }
     }
 
     private fun observeSelectedAgent() {
@@ -311,14 +320,14 @@ class ModelsViewModel(
         updateSettings(current.copy(autoTts = enabled))
     }
 
-    fun updateTtsEngine(engine: String) {
+    fun updateTtsSpeed(speed: Float) {
         val current = _uiState.value.settings
-        updateSettings(current.copy(ttsEngine = engine))
+        updateSettings(current.copy(ttsSpeed = speed))
     }
 
-    fun updateFluxVoice(voice: String) {
+    fun updateTtsPitch(pitch: Float) {
         val current = _uiState.value.settings
-        updateSettings(current.copy(fluxVoice = voice))
+        updateSettings(current.copy(ttsPitch = pitch))
     }
 
     fun updateAndroidVoiceName(voiceName: String) {
@@ -330,6 +339,13 @@ class ModelsViewModel(
         viewModelScope.launch {
             settingsRepository.setAppTheme(theme)
             _uiState.update { it.copy(appTheme = theme) }
+        }
+    }
+
+    fun setFloatingBubbleEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setFloatingBubbleEnabled(enabled)
+            _uiState.update { it.copy(isFloatingBubbleEnabled = enabled) }
         }
     }
 
