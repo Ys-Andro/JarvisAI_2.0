@@ -20,12 +20,28 @@ class HybridTtsRepository(
         fluxTts.isSpeaking
     )
 
+    private fun isSpanishText(text: String): Boolean {
+        val lower = text.lowercase()
+        val hasSpanishChars = Regex("[áéíóúñ¿¡]").containsMatchIn(lower)
+        val spanishWords = listOf(" el ", " la ", " los ", " las ", " de ", " y ", " en ", " un ", " una ", " es ", " por ", " con ", " que ", " para ", " hola ", " buenas ", " noches ", " todos ", " sistemas ")
+        val hasSpanishWords = spanishWords.any { lower.contains(it) }
+        return hasSpanishChars || hasSpanishWords
+    }
+
     override suspend fun speak(text: String, pitch: Float, speed: Float) {
         val settings = settingsRepository.getSettings().first()
-        if (settings.ttsEngine == "openrouter_flux") {
-            fluxTts.speak(text, pitch, speed)
-        } else {
+        val isSpanish = isSpanishText(text)
+
+        if (isSpanish) {
+            // Spanish uses Android TTS optimized for Spanish (natural, clear, male voice, pitch 0.9, speed 0.95)
             androidTts.speak(text, pitch, speed)
+        } else {
+            // English uses Flux TTS (if openrouter_flux engine is active) or Android TTS
+            if (settings.ttsEngine == "openrouter_flux") {
+                fluxTts.speak(text, pitch, speed)
+            } else {
+                androidTts.speak(text, pitch, speed)
+            }
         }
     }
 

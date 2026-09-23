@@ -634,8 +634,8 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     val engines = listOf(
-                        Triple("android", "Android TTS", "Motor integrado del sistema (Offline)"),
-                        Triple("openrouter_flux", "OpenRouter Flux TTS", "Deepgram Flux via OpenRouter (Gratis, Cloud)")
+                        Triple("android", "Android TTS", "Motor integrado (Optimizado para Español claro y natural)"),
+                        Triple("openrouter_flux", "OpenRouter Flux TTS", "Deepgram Flux via OpenRouter (Para Inglés - Masculino grave)")
                     )
 
                     engines.forEach { (id, name, desc) ->

@@ -34,9 +34,9 @@ class AndroidTtsRepository(
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale.getDefault())
+            val result = tts?.setLanguage(Locale("es", "ES"))
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                Log.w(TAG, "Default language missing data, falling back to English US")
+                Log.w(TAG, "Spanish language missing data, falling back to US")
                 tts?.setLanguage(Locale.US)
             }
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -64,30 +64,55 @@ class AndroidTtsRepository(
         }
     }
 
+    private fun cleanTextForTts(text: String): String {
+        return text
+            .replace(Regex("https?://\\S+"), "enlace")
+            .replace(Regex("```[\\s\\S]*?```"), "código")
+            .replace(Regex("`[^`]*`"), "")
+            .replace(Regex("[#*_`~>\\-]"), " ")
+            .replace(Regex("[\\x{1F300}-\\x{1F9FF}]|[\\x{2600}-\\x{26FF}]|[\\x{2700}-\\x{27BF}]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun isSpanishText(text: String): Boolean {
+        val lower = text.lowercase()
+        val hasSpanishChars = Regex("[áéíóúñ¿¡]").containsMatchIn(lower)
+        val spanishWords = listOf(" el ", " la ", " los ", " las ", " de ", " y ", " en ", " un ", " una ", " es ", " por ", " con ", " que ", " para ", " hola ", " buenas ", " noches ", " todos ", " sistemas ")
+        val hasSpanishWords = spanishWords.any { lower.contains(it) }
+        return hasSpanishChars || hasSpanishWords
+    }
+
     override suspend fun speak(text: String, pitch: Float, speed: Float) {
         if (!isInitialized || tts == null) {
             Log.w(TAG, "Cannot speak: TTS not initialized")
             return
         }
         val settings = settingsRepository.getSettings().first()
-        val cleanText = text.replace(Regex("<[^>]*>"), "")
+        val cleanText = cleanTextForTts(text)
+        if (cleanText.isEmpty()) return
 
-        // Apply deeper Jarvis pitch by default (0.9f) or user setting
-        val effectivePitch = if (pitch == 1.0f) settings.ttsPitch else pitch
+        val isSpanish = isSpanishText(cleanText)
+        val targetLocale = if (isSpanish) Locale("es", "ES") else Locale.US
+        tts?.setLanguage(targetLocale)
+
+        // Optimized clarity for Spanish (speed 0.95, pitch 0.9)
+        val effectivePitch = if (isSpanish) 0.9f else (if (pitch == 1.0f) settings.ttsPitch else pitch)
+        val effectiveSpeed = if (isSpanish) 0.95f else speed
         tts?.setPitch(effectivePitch)
-        tts?.setSpeechRate(speed)
+        tts?.setSpeechRate(effectiveSpeed)
 
         try {
-            if (settings.androidVoiceName.isNotBlank()) {
+            if (!isSpanish && settings.androidVoiceName.isNotBlank()) {
                 tts?.voices?.find { it.name == settings.androidVoiceName }?.let { voice ->
                     tts?.voice = voice
                 }
             } else {
+                val langCode = if (isSpanish) "es" else "en"
                 val bestVoice = tts?.voices?.firstOrNull {
-                    it.name.contains("male", ignoreCase = true) &&
-                    (it.locale.language == "en" || it.locale.language == "es")
+                    it.locale.language == langCode && it.name.contains("male", ignoreCase = true)
                 } ?: tts?.voices?.firstOrNull {
-                    it.locale.language == "en" || it.locale.language == "es"
+                    it.locale.language == langCode
                 } ?: tts?.voices?.firstOrNull()
 
                 if (bestVoice != null) {
