@@ -20,6 +20,7 @@ import com.example.jarvisai.presentation.JarvisViewModelFactory
 import com.example.jarvisai.presentation.chat.ChatViewModel
 import com.example.jarvisai.presentation.library.LibraryViewModel
 import com.example.jarvisai.presentation.models.ModelsViewModel
+import com.example.jarvisai.presentation.bubble.FloatingBubbleManager
 import com.example.jarvisai.presentation.navigation.JarvisNavHost
 import com.example.jarvisai.ui.theme.JarvisAiTheme
 import com.example.jarvisai.ui.theme.JarvisBackground
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FloatingBubbleManager.init(this)
         enableEdgeToEdge()
 
         if (intent?.getBooleanExtra(EXTRA_OPEN_LIVE_MODE, false) == true) {

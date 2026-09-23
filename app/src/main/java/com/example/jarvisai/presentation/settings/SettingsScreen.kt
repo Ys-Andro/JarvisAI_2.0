@@ -22,21 +22,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Adjust
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.ui.platform.LocalContext
-import com.example.jarvisai.presentation.bubble.FloatingBubbleManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -51,17 +45,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -73,7 +64,6 @@ import androidx.compose.ui.unit.sp
 import com.example.jarvisai.domain.model.AppThemeMode
 import com.example.jarvisai.presentation.models.ModelsViewModel
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
-import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBackground
 import com.example.jarvisai.ui.theme.JarvisBorder
 import com.example.jarvisai.ui.theme.JarvisBorderGlow
@@ -93,12 +83,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val settings = uiState.settings
     var apiKeyInput by remember(uiState.apiKey) { mutableStateOf(uiState.apiKey ?: "") }
     
     // All sections collapsed by default when entering Settings
-    var isBubbleExpanded by remember { mutableStateOf(false) }
     var isApiKeysExpanded by remember { mutableStateOf(false) }
     var isMemoryExpanded by remember { mutableStateOf(false) }
     var isAgentExpanded by remember { mutableStateOf(false) }
@@ -107,6 +95,9 @@ fun SettingsScreen(
     var isSystemPromptExpanded by remember { mutableStateOf(false) }
     var isTtsExpanded by remember { mutableStateOf(false) }
     var isThemeExpanded by remember { mutableStateOf(false) }
+    var isBubbleExpanded by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
 
     Scaffold(
         modifier = modifier
@@ -124,237 +115,65 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Section -2: Floating Smart Bubble Overlay
+            // Section -1.5: Floating Bubble
             item {
-                var hasOverlayPermission by remember {
-                    mutableStateOf(FloatingBubbleManager.canDrawOverlays(context))
-                }
-                val isServiceActive by FloatingBubbleManager.isServiceActive.collectAsState()
-
-                val screenLifecycleOwner = LocalLifecycleOwner.current
-                DisposableEffect(screenLifecycleOwner) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME) {
-                            hasOverlayPermission = FloatingBubbleManager.canDrawOverlays(context)
-                            FloatingBubbleManager.syncServiceState(context)
-                        }
-                    }
-                    screenLifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose {
-                        screenLifecycleOwner.lifecycle.removeObserver(observer)
-                    }
-                }
-
                 SettingsSectionCard(
-                    title = "BURBUJA FLOTANTE INTELIGENTE",
-                    icon = Icons.Default.Adjust,
+                    title = "MODO FLOTANTE (JARVIS BUBBLE)",
+                    icon = Icons.Default.SmartToy,
                     isCollapsible = true,
                     isExpanded = isBubbleExpanded,
-                    onToggleExpand = {
-                        hasOverlayPermission = FloatingBubbleManager.canDrawOverlays(context)
-                        FloatingBubbleManager.syncServiceState(context)
-                        isBubbleExpanded = !isBubbleExpanded
-                    }
+                    onToggleExpand = { isBubbleExpanded = !isBubbleExpanded }
                 ) {
                     Text(
-                        text = "Orbe inteligente de Jarvis siempre accesible sobre cualquier aplicación. Incluye Mini Chat con dictado rápido, acceso a Live Mode y reactividad visual.",
+                        text = "Activa una burbuja flotante para acceder a Jarvis y al Mini Chat desde cualquier aplicación. Requiere permiso de superposición.",
                         color = JarvisTextSecondary,
                         fontSize = 12.sp,
                         lineHeight = 16.sp
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-
-                    if (!hasOverlayPermission) {
-                        Surface(
-                            color = JarvisAccentRed.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentRed.copy(alpha = 0.5f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = JarvisAccentRed,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Permiso de Superposición Requerido",
-                                        color = JarvisAccentRed,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Para que la burbuja de Jarvis funcione sobre otras apps, autoriza 'Aparecer encima de otras apps' en los ajustes de Android.",
-                                    color = JarvisTextSecondary,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp
+                    
+                    Button(
+                        onClick = {
+                            if (android.provider.Settings.canDrawOverlays(context)) {
+                                val intent = android.content.Intent(context, com.example.jarvisai.presentation.bubble.JarvisBubbleService::class.java)
+                                context.startService(intent)
+                            } else {
+                                val intent = android.content.Intent(
+                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    android.net.Uri.parse("package:${context.packageName}")
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Button(
-                                    onClick = {
-                                        context.startActivity(FloatingBubbleManager.getOverlayPermissionIntent(context))
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = JarvisAccentRed),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = "CONCEDER PERMISO DE SUPERPOSICIÓN",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
+                                context.startActivity(intent)
                             }
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(JarvisSurfaceVariant)
-                                .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Activar Burbuja Flotante",
-                                    color = JarvisTextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = if (isServiceActive) "● EN EJECUCIÓN SOBRE OTRAS APPS" else "○ DETENIDA",
-                                        color = if (isServiceActive) JarvisAccentGreen else JarvisTextSecondary,
-                                        fontSize = 10.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = isServiceActive,
-                                onCheckedChange = { enable ->
-                                    if (enable) {
-                                        if (!FloatingBubbleManager.canDrawOverlays(context)) {
-                                            context.startActivity(FloatingBubbleManager.getOverlayPermissionIntent(context))
-                                        } else {
-                                            viewModel.setFloatingBubbleEnabled(true)
-                                            FloatingBubbleManager.startBubbleService(context)
-                                        }
-                                    } else {
-                                        viewModel.setFloatingBubbleEnabled(false)
-                                        FloatingBubbleManager.stopBubbleService(context)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = JarvisBackground,
-                                    checkedTrackColor = JarvisPrimary,
-                                    uncheckedThumbColor = JarvisTextSecondary,
-                                    uncheckedTrackColor = JarvisSurface
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    if (!FloatingBubbleManager.canDrawOverlays(context)) {
-                                        context.startActivity(FloatingBubbleManager.getOverlayPermissionIntent(context))
-                                    } else {
-                                        viewModel.setFloatingBubbleEnabled(true)
-                                        FloatingBubbleManager.startBubbleService(context)
-                                    }
-                                },
-                                enabled = !isServiceActive,
-                                colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "INICIAR AHORA",
-                                    color = JarvisBackground,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Button(
-                                onClick = {
-                                    viewModel.setFloatingBubbleEnabled(false)
-                                    FloatingBubbleManager.stopBubbleService(context)
-                                },
-                                enabled = isServiceActive,
-                                colors = ButtonDefaults.buttonColors(containerColor = JarvisAccentRed),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "DETENER",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Surface(
-                        color = Color(0xFF00141C),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
-                        modifier = Modifier.fillMaxWidth()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "GESTOS DEL ORBE FLOTANTE:",
-                                color = JarvisPrimary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Text(
-                                text = "👆 Tap simple: Abre o cierra el Mini Chat flotante.",
-                                color = JarvisTextPrimary,
-                                fontSize = 11.sp
-                            )
-                            Text(
-                                text = "✌️ Doble tap: Lanza Jarvis Live Mode (conversación por voz).",
-                                color = JarvisTextPrimary,
-                                fontSize = 11.sp
-                            )
-                            Text(
-                                text = "⏱️ Mantener pulsado: Halo radial con 4 accesos rápidos.",
-                                color = JarvisTextPrimary,
-                                fontSize = 11.sp
-                            )
-                            Text(
-                                text = "🖐️ Arrastrar: Mueve libremente. Suelta en la 'X' inferior para ocultar.",
-                                color = JarvisTextPrimary,
-                                fontSize = 11.sp
-                            )
-                        }
+                        Text(
+                            text = "ACTIVAR BURBUJA FLOTANTE",
+                            color = JarvisBackground,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            val intent = android.content.Intent(context, com.example.jarvisai.presentation.bubble.JarvisBubbleService::class.java)
+                            context.stopService(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = JarvisSurfaceVariant),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "DESACTIVAR BURBUJA",
+                            color = JarvisPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
                     }
                 }
             }

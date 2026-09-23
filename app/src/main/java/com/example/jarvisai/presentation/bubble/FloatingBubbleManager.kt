@@ -18,19 +18,19 @@ object FloatingBubbleManager {
     private val _isServiceActive = MutableStateFlow(false)
     val isServiceActive: StateFlow<Boolean> = _isServiceActive.asStateFlow()
 
+    /**
+     * Initializes the service active state based on whether the service is actually running.
+     */
+    fun init(context: Context) {
+        _isServiceActive.value = isServiceRunning(context)
+    }
+
     fun setVisualState(state: JarvisVisualState) {
         _visualState.value = state
     }
 
     fun setServiceActive(active: Boolean) {
         _isServiceActive.value = active
-    }
-
-    /**
-     * Synchronizes the service active state with the real running status from ActivityManager.
-     */
-    fun syncServiceState(context: Context) {
-        _isServiceActive.value = isServiceRunning(context)
     }
 
     /**
@@ -54,13 +54,9 @@ object FloatingBubbleManager {
 
     /**
      * Starts the FloatingBubbleService as a foreground service.
-     * Returns true if started, or false (and opens settings) if overlay permission is missing.
      */
-    fun startBubbleService(context: Context): Boolean {
-        if (!canDrawOverlays(context)) {
-            context.startActivity(getOverlayPermissionIntent(context))
-            return false
-        }
+    fun startBubbleService(context: Context) {
+        if (!canDrawOverlays(context)) return
 
         val intent = Intent(context, FloatingBubbleService::class.java).apply {
             action = FloatingBubbleService.ACTION_START
@@ -70,8 +66,6 @@ object FloatingBubbleManager {
         } else {
             context.startService(intent)
         }
-        _isServiceActive.value = true
-        return true
     }
 
     /**
@@ -82,7 +76,6 @@ object FloatingBubbleManager {
             action = FloatingBubbleService.ACTION_STOP
         }
         context.startService(intent)
-        _isServiceActive.value = false
     }
 
     /**

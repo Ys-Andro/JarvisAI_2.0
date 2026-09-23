@@ -25,6 +25,13 @@ data class CloudAiModel(
         val ALL_MODELS = listOf(
             // Google Gemini
             CloudAiModel(
+                id = "gemini-3.6-flash",
+                provider = ModelProvider.GEMINI,
+                name = "Gemini 3.6 Flash",
+                description = "Próxima generación: Inteligencia ultra avanzada y velocidad extrema",
+                defaultContextLength = 2097152
+            ),
+            CloudAiModel(
                 id = "gemini-2.5-flash",
                 provider = ModelProvider.GEMINI,
                 name = "Gemini 2.5 Flash",
