@@ -27,6 +27,13 @@ object FloatingBubbleManager {
     }
 
     /**
+     * Synchronizes the service active state with the real running status from ActivityManager.
+     */
+    fun syncServiceState(context: Context) {
+        _isServiceActive.value = isServiceRunning(context)
+    }
+
+    /**
      * Checks if the app has permission to draw overlays (SYSTEM_ALERT_WINDOW).
      */
     fun canDrawOverlays(context: Context): Boolean {
@@ -47,9 +54,13 @@ object FloatingBubbleManager {
 
     /**
      * Starts the FloatingBubbleService as a foreground service.
+     * Returns true if started, or false (and opens settings) if overlay permission is missing.
      */
-    fun startBubbleService(context: Context) {
-        if (!canDrawOverlays(context)) return
+    fun startBubbleService(context: Context): Boolean {
+        if (!canDrawOverlays(context)) {
+            context.startActivity(getOverlayPermissionIntent(context))
+            return false
+        }
 
         val intent = Intent(context, FloatingBubbleService::class.java).apply {
             action = FloatingBubbleService.ACTION_START
@@ -59,6 +70,8 @@ object FloatingBubbleManager {
         } else {
             context.startService(intent)
         }
+        _isServiceActive.value = true
+        return true
     }
 
     /**
@@ -69,6 +82,7 @@ object FloatingBubbleManager {
             action = FloatingBubbleService.ACTION_STOP
         }
         context.startService(intent)
+        _isServiceActive.value = false
     }
 
     /**

@@ -24,12 +24,14 @@ import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
@@ -38,6 +40,7 @@ import com.example.MainActivity
 import com.example.JarvisApplication
 import com.example.jarvisai.di.AppContainer
 import com.example.jarvisai.domain.model.GenerationSettings
+import com.example.jarvisai.ui.theme.JarvisAiTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -116,7 +119,10 @@ class FloatingBubbleService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        // 1. Mandatory permission check for SYSTEM_ALERT_WINDOW
+        // 1. Mandatory immediate foreground start to satisfy Android 8+ foreground service requirements
+        startForegroundNotification()
+
+        // 2. Mandatory permission check for SYSTEM_ALERT_WINDOW
         if (!Settings.canDrawOverlays(this)) {
             Log.e(TAG, "SYSTEM_ALERT_WINDOW permission is not granted. Cannot start overlay.")
             FloatingBubbleManager.setServiceActive(false)
@@ -133,7 +139,6 @@ class FloatingBubbleService : Service() {
             onResume()
         }
 
-        startForegroundNotification()
         FloatingBubbleManager.setServiceActive(true)
 
         // Observe global visual state changes to synchronize with bubble
@@ -148,6 +153,8 @@ class FloatingBubbleService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForegroundNotification()
+
         if (!Settings.canDrawOverlays(this)) {
             Log.e(TAG, "SYSTEM_ALERT_WINDOW permission missing in onStartCommand. Stopping service.")
             FloatingBubbleManager.setServiceActive(false)
@@ -155,10 +162,17 @@ class FloatingBubbleService : Service() {
             return START_NOT_STICKY
         }
 
+        FloatingBubbleManager.setServiceActive(true)
+
         when (intent?.action) {
             ACTION_STOP -> {
                 stopSelf()
                 return START_NOT_STICKY
+            }
+            ACTION_START -> {
+                if (bubbleComposeView == null || bubbleComposeView?.isAttachedToWindow != true) {
+                    setupViews()
+                }
             }
             ACTION_SET_STATE -> {
                 val stateName = intent.getStringExtra(EXTRA_VISUAL_STATE)
@@ -249,7 +263,7 @@ class FloatingBubbleService : Service() {
             .build()
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
@@ -265,6 +279,10 @@ class FloatingBubbleService : Service() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupViews() {
+        if (bubbleComposeView != null && bubbleComposeView?.isAttachedToWindow == true) {
+            return
+        }
+
         val displayMetrics = resources.displayMetrics
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -289,23 +307,26 @@ class FloatingBubbleService : Service() {
         }
 
         bubbleComposeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycleOwner))
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setContent {
-                FloatingBubbleOrb(
-                    visualState = visualState,
-                    isMuted = isMuted,
-                    isHaloExpanded = isHaloExpanded,
-                    onTap = { toggleMiniChat() },
-                    onDoubleTap = { launchLiveMode() },
-                    onLongPress = { toggleHalo() },
-                    onActionClick = { action -> handleBubbleAction(action) },
-                    onDismissHalo = {
-                        isHaloExpanded = false
-                        resizeBubbleWindow(false)
-                    }
-                )
+                JarvisAiTheme {
+                    FloatingBubbleOrb(
+                        visualState = visualState,
+                        isMuted = isMuted,
+                        isHaloExpanded = isHaloExpanded,
+                        onTap = { toggleMiniChat() },
+                        onDoubleTap = { launchLiveMode() },
+                        onLongPress = { toggleHalo() },
+                        onActionClick = { action -> handleBubbleAction(action) },
+                        onDismissHalo = {
+                            isHaloExpanded = false
+                            resizeBubbleWindow(false)
+                        }
+                    )
+                }
             }
         }
 
@@ -330,6 +351,7 @@ class FloatingBubbleService : Service() {
             }
         })
 
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
@@ -337,6 +359,11 @@ class FloatingBubbleService : Service() {
         var isMovementSignificant = false
 
         bubbleComposeView?.setOnTouchListener { _, event ->
+            if (isHaloExpanded) {
+                // When halo is expanded, permit Compose to handle satellite buttons and backdrop tap
+                return@setOnTouchListener false
+            }
+
             gestureDetector.onTouchEvent(event)
 
             when (event.action) {
@@ -352,7 +379,7 @@ class FloatingBubbleService : Service() {
                     val deltaX = (event.rawX - initialTouchX).toInt()
                     val deltaY = (event.rawY - initialTouchY).toInt()
 
-                    if (!isMovementSignificant && (abs(deltaX) > 16 || abs(deltaY) > 16)) {
+                    if (!isMovementSignificant && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop)) {
                         isMovementSignificant = true
                         isDraggingBubble = true
                         if (isHaloExpanded) {
@@ -415,6 +442,7 @@ class FloatingBubbleService : Service() {
                             }
                         } catch (_: Exception) {}
                     }
+                    isOverDismissTarget = false
                     true
                 }
                 else -> false
@@ -434,6 +462,7 @@ class FloatingBubbleService : Service() {
             dismissTargetSize,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -442,14 +471,17 @@ class FloatingBubbleService : Service() {
         }
 
         dismissTargetComposeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycleOwner))
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setContent {
-                FloatingBubbleDismissTarget(
-                    isVisible = isDraggingBubble,
-                    isHovered = isOverDismissTarget
-                )
+                JarvisAiTheme {
+                    FloatingBubbleDismissTarget(
+                        isVisible = isDraggingBubble,
+                        isHovered = isOverDismissTarget
+                    )
+                }
             }
         }
 
@@ -475,23 +507,26 @@ class FloatingBubbleService : Service() {
         }
 
         miniChatComposeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycleOwner))
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setContent {
-                if (isMiniChatVisible) {
-                    MiniChatCard(
-                        visualState = visualState,
-                        messages = miniChatMessages,
-                        inputText = miniChatInputText,
-                        onInputChange = { miniChatInputText = it },
-                        onSendMessage = { prompt -> askJarvis(prompt) },
-                        onStartVoiceDictation = { startVoiceDictation() },
-                        onStopVoiceDictation = { stopVoiceDictation() },
-                        onOpenLiveMode = { launchLiveMode() },
-                        onOpenFullApp = { launchFullApp() },
-                        onCloseClick = { closeMiniChat() }
-                    )
+                JarvisAiTheme {
+                    if (isMiniChatVisible) {
+                        MiniChatCard(
+                            visualState = visualState,
+                            messages = miniChatMessages,
+                            inputText = miniChatInputText,
+                            onInputChange = { miniChatInputText = it },
+                            onSendMessage = { prompt -> askJarvis(prompt) },
+                            onStartVoiceDictation = { startVoiceDictation() },
+                            onStopVoiceDictation = { stopVoiceDictation() },
+                            onOpenLiveMode = { launchLiveMode() },
+                            onOpenFullApp = { launchFullApp() },
+                            onCloseClick = { closeMiniChat() }
+                        )
+                    }
                 }
             }
         }
@@ -749,7 +784,19 @@ class FloatingBubbleService : Service() {
         FloatingBubbleManager.setVisualState(JarvisVisualState.IDLE)
 
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping foreground notification", e)
+        }
+
+        try {
             speechRecognizer?.destroy()
+            speechRecognizer = null
         } catch (_: Exception) {}
 
         serviceScope.cancel()
@@ -757,6 +804,10 @@ class FloatingBubbleService : Service() {
         safeRemoveView(bubbleComposeView)
         safeRemoveView(miniChatComposeView)
         safeRemoveView(dismissTargetComposeView)
+
+        bubbleComposeView = null
+        miniChatComposeView = null
+        dismissTargetComposeView = null
 
         lifecycleOwner.onDestroy()
     }

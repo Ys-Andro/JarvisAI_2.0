@@ -51,11 +51,15 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -127,6 +131,20 @@ fun SettingsScreen(
                 }
                 val isServiceActive by FloatingBubbleManager.isServiceActive.collectAsState()
 
+                val screenLifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(screenLifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            hasOverlayPermission = FloatingBubbleManager.canDrawOverlays(context)
+                            FloatingBubbleManager.syncServiceState(context)
+                        }
+                    }
+                    screenLifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        screenLifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
+
                 SettingsSectionCard(
                     title = "BURBUJA FLOTANTE INTELIGENTE",
                     icon = Icons.Default.Adjust,
@@ -134,6 +152,7 @@ fun SettingsScreen(
                     isExpanded = isBubbleExpanded,
                     onToggleExpand = {
                         hasOverlayPermission = FloatingBubbleManager.canDrawOverlays(context)
+                        FloatingBubbleManager.syncServiceState(context)
                         isBubbleExpanded = !isBubbleExpanded
                     }
                 ) {
@@ -226,10 +245,15 @@ fun SettingsScreen(
                             Switch(
                                 checked = isServiceActive,
                                 onCheckedChange = { enable ->
-                                    viewModel.setFloatingBubbleEnabled(enable)
                                     if (enable) {
-                                        FloatingBubbleManager.startBubbleService(context)
+                                        if (!FloatingBubbleManager.canDrawOverlays(context)) {
+                                            context.startActivity(FloatingBubbleManager.getOverlayPermissionIntent(context))
+                                        } else {
+                                            viewModel.setFloatingBubbleEnabled(true)
+                                            FloatingBubbleManager.startBubbleService(context)
+                                        }
                                     } else {
+                                        viewModel.setFloatingBubbleEnabled(false)
                                         FloatingBubbleManager.stopBubbleService(context)
                                     }
                                 },
@@ -250,8 +274,12 @@ fun SettingsScreen(
                         ) {
                             Button(
                                 onClick = {
-                                    viewModel.setFloatingBubbleEnabled(true)
-                                    FloatingBubbleManager.startBubbleService(context)
+                                    if (!FloatingBubbleManager.canDrawOverlays(context)) {
+                                        context.startActivity(FloatingBubbleManager.getOverlayPermissionIntent(context))
+                                    } else {
+                                        viewModel.setFloatingBubbleEnabled(true)
+                                        FloatingBubbleManager.startBubbleService(context)
+                                    }
                                 },
                                 enabled = !isServiceActive,
                                 colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary),
