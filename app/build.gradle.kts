@@ -5,6 +5,23 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
+val versionPropsFile = file("${rootDir}/version.properties")
+val versionProps = java.util.Properties().apply {
+  if (versionPropsFile.exists()) {
+    versionPropsFile.inputStream().use { load(it) }
+  }
+}
+
+val currentVersionCode = (System.getenv("VERSION_CODE")
+  ?: project.findProperty("versionCode") as? String
+  ?: versionProps.getProperty("versionCode")
+  ?: "35").toInt()
+
+val currentVersionName = System.getenv("VERSION_NAME")
+  ?: project.findProperty("versionName") as? String
+  ?: versionProps.getProperty("versionName")
+  ?: "2.0.35"
+
 android {
   namespace = "com.example"
   compileSdk = 35
@@ -13,8 +30,8 @@ android {
     applicationId = "com.aistudio.jarvisai.kxvqnm"
     minSdk = 26
     targetSdk = 35
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = currentVersionCode
+    versionName = currentVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -37,22 +54,37 @@ android {
 
   signingConfigs {
     create("release") {
-      val customKeystorePath = System.getenv("KEYSTORE_PATH")
-      val keyFile = if (customKeystorePath != null) file(customKeystorePath) else file("${rootDir}/my-upload-key.jks")
-      if (keyFile.exists()) {
-        storeFile = keyFile
-        storePassword = System.getenv("STORE_PASSWORD") ?: "android"
-        keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
-        keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
-      } else {
-        val debugStore = file("${rootDir}/debug.keystore")
-        if (debugStore.exists()) {
-          storeFile = debugStore
-          storePassword = "android"
-          keyAlias = "androiddebugkey"
-          keyPassword = "android"
-        }
+      val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+        ?: System.getenv("KEYSTORE_PATH")
+      val keystorePassword = System.getenv("RELEASE_STORE_PASSWORD")
+        ?: System.getenv("STORE_PASSWORD")
+      val keyAliasName = System.getenv("RELEASE_KEY_ALIAS")
+        ?: System.getenv("KEY_ALIAS")
+      val keyPass = System.getenv("RELEASE_KEY_PASSWORD")
+        ?: System.getenv("KEY_PASSWORD")
+
+      val releaseFile = if (!keystorePath.isNullOrBlank()) file(keystorePath) else file("${rootDir}/release.keystore")
+      val customUploadFile = file("${rootDir}/my-upload-key.jks")
+      val debugStore = file("${rootDir}/debug.keystore")
+
+      if (releaseFile.exists()) {
+        storeFile = releaseFile
+        storePassword = keystorePassword ?: "android"
+        keyAlias = keyAliasName ?: "jarvis"
+        keyPassword = keyPass ?: keystorePassword ?: "android"
+      } else if (customUploadFile.exists()) {
+        storeFile = customUploadFile
+        storePassword = keystorePassword ?: "android"
+        keyAlias = keyAliasName ?: "upload"
+        keyPassword = keyPass ?: keystorePassword ?: "android"
+      } else if (debugStore.exists()) {
+        storeFile = debugStore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
       }
+      enableV1Signing = true
+      enableV2Signing = true
     }
     create("debugConfig") {
       val debugStore = file("${rootDir}/debug.keystore")
@@ -62,6 +94,8 @@ android {
         keyAlias = "androiddebugkey"
         keyPassword = "android"
       }
+      enableV1Signing = true
+      enableV2Signing = true
     }
   }
 

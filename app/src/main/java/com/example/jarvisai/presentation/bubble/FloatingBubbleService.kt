@@ -102,6 +102,7 @@ class FloatingBubbleService : Service() {
     private var isMiniChatVisible by mutableStateOf(false)
     private var isDraggingBubble by mutableStateOf(false)
     private var isOverDismissTarget by mutableStateOf(false)
+    private var isAddingViews = false
 
     // Chat State for Floating Mini Card
     private val miniChatMessages = mutableStateListOf<MiniChatMessage>()
@@ -117,6 +118,7 @@ class FloatingBubbleService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
+        Log.d(TAG, "onCreate() called")
         super.onCreate()
 
         // 1. Mandatory immediate foreground start to satisfy Android 8+ foreground service requirements
@@ -144,6 +146,7 @@ class FloatingBubbleService : Service() {
         // Observe global visual state changes to synchronize with bubble
         serviceScope.launch {
             FloatingBubbleManager.visualState.collect { newState ->
+                Log.d(TAG, "Visual state changed to: $newState")
                 visualState = newState
             }
         }
@@ -153,6 +156,7 @@ class FloatingBubbleService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand() called with action: ${intent?.action}")
         startForegroundNotification()
 
         if (!Settings.canDrawOverlays(this)) {
@@ -166,16 +170,20 @@ class FloatingBubbleService : Service() {
 
         when (intent?.action) {
             ACTION_STOP -> {
+                Log.d(TAG, "onStartCommand: ACTION_STOP")
                 stopSelf()
                 return START_NOT_STICKY
             }
             ACTION_START -> {
+                Log.d(TAG, "onStartCommand: ACTION_START")
                 if (bubbleComposeView == null || bubbleComposeView?.isAttachedToWindow != true) {
+                    Log.d(TAG, "onStartCommand: View not attached, calling setupViews")
                     setupViews()
                 }
             }
             ACTION_SET_STATE -> {
                 val stateName = intent.getStringExtra(EXTRA_VISUAL_STATE)
+                Log.d(TAG, "onStartCommand: ACTION_SET_STATE $stateName")
                 stateName?.let {
                     try {
                         val state = JarvisVisualState.valueOf(it)
@@ -197,6 +205,10 @@ class FloatingBubbleService : Service() {
         val displayMetrics = resources.displayMetrics
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
+        Log.d(TAG, "updateScreenDimensions: screenWidth=$screenWidth, screenHeight=$screenHeight")
+        if (screenWidth == 0 || screenHeight == 0) {
+            Log.w(TAG, "Screen dimensions are 0, bubble might be invisible or misplaced")
+        }
     }
 
     private fun clampBubblePosition() {
@@ -279,11 +291,15 @@ class FloatingBubbleService : Service() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupViews() {
-        if (bubbleComposeView != null && bubbleComposeView?.isAttachedToWindow == true) {
+        Log.d(TAG, "setupViews() called")
+        if (bubbleComposeView != null && (bubbleComposeView?.isAttachedToWindow == true || isAddingViews)) {
+            Log.d(TAG, "setupViews: Already attached or adding. attached=${bubbleComposeView?.isAttachedToWindow}, isAdding=$isAddingViews")
             return
         }
 
+        isAddingViews = true
         val displayMetrics = resources.displayMetrics
+        Log.d(TAG, "setupViews: metrics width=${displayMetrics.widthPixels}, height=${displayMetrics.heightPixels}, density=${displayMetrics.density}")
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -291,8 +307,11 @@ class FloatingBubbleService : Service() {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
         }
+        Log.d(TAG, "setupViews: overlayType=$overlayType")
 
         val initialBubbleSize = (90 * displayMetrics.density).toInt()
+        Log.d(TAG, "setupViews: initialBubbleSize=$initialBubbleSize")
+
         bubbleParams = WindowManager.LayoutParams(
             initialBubbleSize,
             initialBubbleSize,
@@ -303,11 +322,12 @@ class FloatingBubbleService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = (16 * displayMetrics.density).toInt()
-            y = screenHeight / 3
+            y = if (screenHeight > 0) screenHeight / 3 else (200 * displayMetrics.density).toInt()
         }
+        Log.d(TAG, "setupViews: initial bubble position x=${bubbleParams.x}, y=${bubbleParams.y}")
 
         bubbleComposeView = ComposeView(this).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycleOwner))
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
@@ -332,6 +352,7 @@ class FloatingBubbleService : Service() {
 
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                Log.d(TAG, "GestureDetector: onSingleTapConfirmed")
                 if (isHaloExpanded) {
                     isHaloExpanded = false
                     resizeBubbleWindow(false)
@@ -342,11 +363,13 @@ class FloatingBubbleService : Service() {
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
+                Log.d(TAG, "GestureDetector: onDoubleTap")
                 launchLiveMode()
                 return true
             }
 
             override fun onLongPress(e: MotionEvent) {
+                Log.d(TAG, "GestureDetector: onLongPress")
                 toggleHalo()
             }
         })
@@ -360,7 +383,6 @@ class FloatingBubbleService : Service() {
 
         bubbleComposeView?.setOnTouchListener { _, event ->
             if (isHaloExpanded) {
-                // When halo is expanded, permit Compose to handle satellite buttons and backdrop tap
                 return@setOnTouchListener false
             }
 
@@ -397,7 +419,6 @@ class FloatingBubbleService : Service() {
                             }
                         } catch (_: Exception) {}
 
-                        // Calculate proximity to bottom dismiss target
                         val targetCenterX = screenWidth / 2
                         val targetCenterY = screenHeight - (90 * displayMetrics.density).toInt()
                         val currentCenterX = bubbleParams.x + (bubbleParams.width / 2)
@@ -414,14 +435,12 @@ class FloatingBubbleService : Service() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (isMovementSignificant) {
                         isDraggingBubble = false
-
-                        // Dropped on dismiss target
                         if (isOverDismissTarget) {
+                            Log.d(TAG, "Bubble dropped on dismiss target. Stopping service.")
                             stopSelf()
                             return@setOnTouchListener true
                         }
 
-                        // Snap to nearest screen edge (left or right)
                         val currentX = bubbleParams.x
                         val margin = (12 * displayMetrics.density).toInt()
                         val targetX = if (currentX + (bubbleParams.width / 2) < screenWidth / 2) {
@@ -431,7 +450,6 @@ class FloatingBubbleService : Service() {
                         }
 
                         bubbleParams.x = targetX
-                        // Keep Y inside screen boundaries
                         val minY = margin
                         val maxY = screenHeight - bubbleParams.height - (margin * 3)
                         bubbleParams.y = bubbleParams.y.coerceIn(minY, maxY)
@@ -450,12 +468,13 @@ class FloatingBubbleService : Service() {
         }
 
         try {
+            Log.d(TAG, "setupViews: Adding bubble view to WindowManager")
             windowManager.addView(bubbleComposeView, bubbleParams)
+            Log.d(TAG, "setupViews: Added bubble view successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Error adding bubble view to windowManager", e)
+            Log.e(TAG, "setupViews: Error adding bubble view", e)
         }
 
-        // Setup Dismiss Target View (bottom center)
         val dismissTargetSize = (110 * displayMetrics.density).toInt()
         dismissTargetParams = WindowManager.LayoutParams(
             dismissTargetSize,
@@ -471,7 +490,7 @@ class FloatingBubbleService : Service() {
         }
 
         dismissTargetComposeView = ComposeView(this).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycleOwner))
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
@@ -486,12 +505,13 @@ class FloatingBubbleService : Service() {
         }
 
         try {
+            Log.d(TAG, "setupViews: Adding dismiss target view to WindowManager")
             windowManager.addView(dismissTargetComposeView, dismissTargetParams)
+            Log.d(TAG, "setupViews: Added dismiss target view successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Error adding dismiss target view", e)
+            Log.e(TAG, "setupViews: Error adding dismiss target view", e)
         }
 
-        // Setup Mini Chat Card View
         val cardWidth = (340 * displayMetrics.density).toInt().coerceAtMost(screenWidth - 32)
         val cardHeight = (440 * displayMetrics.density).toInt().coerceAtMost(screenHeight - 80)
 
@@ -507,7 +527,7 @@ class FloatingBubbleService : Service() {
         }
 
         miniChatComposeView = ComposeView(this).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycleOwner))
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
@@ -531,6 +551,13 @@ class FloatingBubbleService : Service() {
             }
         }
 
+        try {
+            Log.d(TAG, "setupViews: Adding mini chat view to WindowManager")
+            windowManager.addView(miniChatComposeView, miniChatParams)
+            Log.d(TAG, "setupViews: Added mini chat view successfully")
+        } catch (e: Exception) {
+            Log.w(TAG, "setupViews: Error adding mini chat view initially (normal if hidden)", e)
+        }
         miniChatComposeView?.setOnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_OUTSIDE) {
                 closeMiniChat()
@@ -539,6 +566,7 @@ class FloatingBubbleService : Service() {
                 false
             }
         }
+        isAddingViews = false
     }
 
     private fun resizeBubbleWindow(expandHalo: Boolean) {
@@ -779,6 +807,7 @@ class FloatingBubbleService : Service() {
     }
 
     override fun onDestroy() {
+        Log.d(TAG, "onDestroy() called")
         super.onDestroy()
         FloatingBubbleManager.setServiceActive(false)
         FloatingBubbleManager.setVisualState(JarvisVisualState.IDLE)
