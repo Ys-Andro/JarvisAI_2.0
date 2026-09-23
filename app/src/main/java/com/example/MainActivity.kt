@@ -14,25 +14,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import android.content.Intent
 import com.example.jarvisai.di.AppContainer
 import com.example.jarvisai.presentation.JarvisViewModelFactory
 import com.example.jarvisai.presentation.chat.ChatViewModel
 import com.example.jarvisai.presentation.library.LibraryViewModel
 import com.example.jarvisai.presentation.models.ModelsViewModel
-import com.example.jarvisai.presentation.bubble.FloatingBubbleManager
 import com.example.jarvisai.presentation.navigation.JarvisNavHost
 import com.example.jarvisai.ui.theme.JarvisAiTheme
 import com.example.jarvisai.ui.theme.JarvisBackground
 
 class MainActivity : ComponentActivity() {
 
-    companion object {
-        const val EXTRA_OPEN_LIVE_MODE = "EXTRA_OPEN_LIVE_MODE"
-    }
-
     private val appContainer by lazy {
-        (application as? JarvisApplication)?.appContainer ?: AppContainer(applicationContext)
+        AppContainer(applicationContext)
     }
 
     private val viewModelFactory by lazy {
@@ -43,22 +37,9 @@ class MainActivity : ComponentActivity() {
     private val libraryViewModel: LibraryViewModel by viewModels { viewModelFactory }
     private val modelsViewModel: ModelsViewModel by viewModels { viewModelFactory }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        if (intent.getBooleanExtra(EXTRA_OPEN_LIVE_MODE, false)) {
-            chatViewModel.openLiveMode()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        FloatingBubbleManager.init(this)
         enableEdgeToEdge()
-
-        if (intent?.getBooleanExtra(EXTRA_OPEN_LIVE_MODE, false) == true) {
-            chatViewModel.openLiveMode()
-        }
 
         setContent {
             val modelsUiState by modelsViewModel.uiState.collectAsState()
@@ -97,3 +78,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

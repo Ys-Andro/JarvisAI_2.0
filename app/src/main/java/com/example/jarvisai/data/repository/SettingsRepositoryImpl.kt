@@ -69,12 +69,4 @@ class SettingsRepositoryImpl(
     override suspend fun setSelectedAgentId(agentId: String) {
         appPreferences.setSelectedAgentId(agentId)
     }
-
-    override fun isFloatingBubbleEnabled(): Flow<Boolean> {
-        return appPreferences.floatingBubbleEnabled
-    }
-
-    override suspend fun setFloatingBubbleEnabled(enabled: Boolean) {
-        appPreferences.setFloatingBubbleEnabled(enabled)
-    }
 }
