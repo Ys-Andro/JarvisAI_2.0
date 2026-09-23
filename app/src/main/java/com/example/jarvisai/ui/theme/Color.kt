@@ -38,4 +38,6 @@ val JarvisTextTertiary = Color(0xFF53627E)      // Subtle metadata / timestamps
 // System & Telemetry Accents
 val JarvisAccentGreen = Color(0xFF00E676)       // Online status / Tok/s metrics
 val JarvisAccentRed = Color(0xFFFF3D57)         // Stop / Warning / Delete
+val JarvisAccentCyan = Color(0xFF00E5FF)        // Cyan highlight
+val JarvisAccentOrange = Color(0xFFFF9100)      // Standby / Warning
 val JarvisCodeBackground = Color(0xFF090D15)    // Code snippet container

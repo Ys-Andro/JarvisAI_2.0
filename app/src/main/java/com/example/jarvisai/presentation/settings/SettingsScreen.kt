@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
@@ -49,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +67,7 @@ import com.example.jarvisai.presentation.settings.components.SettingsCategoryTab
 import com.example.jarvisai.presentation.settings.components.SettingsHeader
 import com.example.jarvisai.presentation.settings.components.SettingsSectionCard
 import com.example.jarvisai.presentation.settings.components.VoiceSettingsSection
+import com.example.jarvisai.ui.theme.JarvisAccentCyan
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
 import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBackground
@@ -84,6 +87,7 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     onNavigateToMemory: () -> Unit,
     onNavigateToDocuments: () -> Unit,
+    onNavigateToDeviceControl: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -92,6 +96,7 @@ fun SettingsScreen(
 
     var selectedCategory by remember { mutableStateOf(SettingsCategory.ALL) }
 
+    var isDeviceControlExpanded by remember { mutableStateOf(true) }
     var isApiKeysExpanded by remember { mutableStateOf(true) }
     var isAgentExpanded by remember { mutableStateOf(true) }
     var isGenParamsExpanded by remember { mutableStateOf(true) }
@@ -139,6 +144,102 @@ fun SettingsScreen(
                     )
                 }
 
+                // Section: Device Control & Hardware Automation
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.DEVICE_CONTROL) {
+                    item {
+                        SettingsSectionCard(
+                            title = "CONTROL DE DISPOSITIVO",
+                            subtitle = "Hardware, accesibilidad y automatización nativa",
+                            icon = Icons.Default.Smartphone,
+                            badgeText = "INTEGRADO",
+                            badgeColor = JarvisAccentGreen,
+                            isExpanded = isDeviceControlExpanded,
+                            onToggleExpand = { isDeviceControlExpanded = !isDeviceControlExpanded }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "JarvisAI puede interactuar con el hardware del teléfono, abrir aplicaciones, regular volumen, programar alarmas y realizar gestos en pantalla.",
+                                    color = JarvisTextSecondary,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+
+                                Surface(
+                                    onClick = onNavigateToDeviceControl,
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = JarvisPrimary.copy(alpha = 0.12f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.6f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(30.dp)
+                                                    .clip(CircleShape)
+                                                    .background(JarvisPrimary),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Smartphone,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF030712),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Column {
+                                                Text(
+                                                    text = "Centro de Control",
+                                                    color = JarvisTextPrimary,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = "Accesibilidad & Hardware",
+                                                    color = JarvisAccentCyan,
+                                                    fontSize = 9.5.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+
+                                        Surface(
+                                            color = JarvisPrimary.copy(alpha = 0.2f),
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, JarvisPrimary)
+                                        ) {
+                                            Text(
+                                                text = "ABRIR →",
+                                                color = JarvisPrimary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace,
+                                                maxLines = 1,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Section: API Keys & AI Models
                 if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.MODELS_API) {
                     item {
@@ -146,10 +247,10 @@ fun SettingsScreen(
                                 (if (!uiState.apiKey.isNullOrBlank()) 1 else 0)
 
                         SettingsSectionCard(
-                            title = "MODELOS IA & PROVEEDORES",
-                            subtitle = "Configuración de Google Gemini, OpenAI, DeepSeek, Groq, Claude",
+                            title = "MODELOS & PROVEEDORES",
+                            subtitle = "Google Gemini, OpenAI, DeepSeek, Groq, Claude",
                             icon = Icons.Default.Key,
-                            badgeText = if (activeKeysCount > 0) "$activeKeysCount LLAVES" else "PENDIENTE",
+                            badgeText = if (activeKeysCount > 0) "$activeKeysCount LLAVES" else "SIN CLAVE",
                             badgeColor = if (activeKeysCount > 0) JarvisAccentGreen else JarvisAccentRed,
                             isExpanded = isApiKeysExpanded,
                             onToggleExpand = { isApiKeysExpanded = !isApiKeysExpanded }

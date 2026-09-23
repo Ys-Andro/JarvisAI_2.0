@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jarvisai.presentation.JarvisViewModelFactory
 import com.example.jarvisai.presentation.chat.ChatScreen
 import com.example.jarvisai.presentation.chat.ChatViewModel
+import com.example.jarvisai.presentation.device.DeviceControlScreen
 import com.example.jarvisai.presentation.documents.DocumentsScreen
 import com.example.jarvisai.presentation.documents.DocumentsViewModel
 import com.example.jarvisai.presentation.library.LibraryScreen
@@ -75,6 +76,9 @@ fun JarvisNavHost(
                 },
                 onNavigateToDocuments = {
                     navController.navigate(Screen.Documents.route)
+                },
+                onNavigateToDeviceControl = {
+                    navController.navigate(Screen.DeviceControl.route)
                 }
             )
         }
@@ -93,6 +97,14 @@ fun JarvisNavHost(
             val documentsViewModel: DocumentsViewModel = viewModel(factory = viewModelFactory)
             DocumentsScreen(
                 viewModel = documentsViewModel,
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.DeviceControl.route) {
+            DeviceControlScreen(
                 onBackClick = {
                     navController.popBackStack()
                 }

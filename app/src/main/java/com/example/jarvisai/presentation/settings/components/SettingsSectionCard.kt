@@ -63,33 +63,33 @@ fun SettingsSectionCard(
 ) {
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 250),
+        animationSpec = tween(durationMillis = 200),
         label = "arrow_rotation"
     )
 
     val cardBorderBrush = Brush.linearGradient(
         colors = if (isExpanded) {
-            listOf(JarvisPrimary.copy(alpha = 0.6f), JarvisBorder, JarvisPrimary.copy(alpha = 0.2f))
+            listOf(JarvisPrimary.copy(alpha = 0.5f), JarvisBorder, JarvisPrimary.copy(alpha = 0.15f))
         } else {
-            listOf(JarvisBorder, JarvisBorder.copy(alpha = 0.5f))
+            listOf(JarvisBorder, JarvisBorder.copy(alpha = 0.4f))
         }
     )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(JarvisSurface)
             .border(
                 width = 1.dp,
                 brush = cardBorderBrush,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(14.dp)
             )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             // Header clickable area
             Row(
@@ -100,7 +100,7 @@ fun SettingsSectionCard(
                             Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { onToggleExpand() }
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 2.dp)
                         } else Modifier
                     ),
                 verticalAlignment = Alignment.CenterVertically,
@@ -108,21 +108,21 @@ fun SettingsSectionCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f, fill = true)
                 ) {
-                    // Icon in glowing tech container
+                    // Icon container
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isExpanded) JarvisPrimary.copy(alpha = 0.15f)
+                                if (isExpanded) JarvisPrimary.copy(alpha = 0.12f)
                                 else JarvisSurfaceElevated
                             )
                             .border(
                                 width = 1.dp,
-                                color = if (isExpanded) JarvisPrimary.copy(alpha = 0.5f) else JarvisBorder,
-                                shape = RoundedCornerShape(10.dp)
+                                color = if (isExpanded) JarvisPrimary.copy(alpha = 0.4f) else JarvisBorder,
+                                shape = RoundedCornerShape(8.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -130,24 +130,25 @@ fun SettingsSectionCard(
                             imageVector = icon,
                             contentDescription = null,
                             tint = if (isExpanded) JarvisPrimary else JarvisTextSecondary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = title,
                                 color = JarvisTextPrimary,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                letterSpacing = 0.8.sp
+                                letterSpacing = 0.5.sp,
+                                maxLines = 1
                             )
 
                             if (badgeText != null) {
@@ -159,31 +160,34 @@ fun SettingsSectionCard(
                                     Text(
                                         text = badgeText,
                                         color = badgeColor,
-                                        fontSize = 9.sp,
+                                        fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
                                     )
                                 }
                             }
                         }
 
                         if (subtitle != null) {
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(1.dp))
                             Text(
                                 text = subtitle,
                                 color = JarvisTextSecondary,
-                                fontSize = 11.sp,
-                                lineHeight = 14.sp
+                                fontSize = 10.5.sp,
+                                lineHeight = 13.sp,
+                                maxLines = 1
                             )
                         }
                     }
                 }
 
                 if (onToggleExpand != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(28.dp)
                             .clip(CircleShape)
                             .background(JarvisSurfaceElevated)
                             .border(1.dp, JarvisBorder, CircleShape),
@@ -194,7 +198,7 @@ fun SettingsSectionCard(
                             contentDescription = if (isExpanded) "Contraer" else "Expandir",
                             tint = if (isExpanded) JarvisPrimary else JarvisTextSecondary,
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(18.dp)
                                 .rotate(rotationAngle)
                         )
                     }
@@ -204,13 +208,13 @@ fun SettingsSectionCard(
             // Animated content body
             AnimatedVisibility(
                 visible = isExpanded,
-                enter = expandVertically(animationSpec = tween(250)) + fadeIn(animationSpec = tween(200)),
-                exit = shrinkVertically(animationSpec = tween(250)) + fadeOut(animationSpec = tween(200))
+                enter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(150)),
+                exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(150))
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp)
+                        .padding(top = 10.dp)
                 ) {
                     // Futuristic separator
                     Box(
@@ -220,14 +224,14 @@ fun SettingsSectionCard(
                             .background(
                                 Brush.horizontalGradient(
                                     colors = listOf(
-                                        JarvisPrimary.copy(alpha = 0.4f),
+                                        JarvisPrimary.copy(alpha = 0.35f),
                                         JarvisBorder,
                                         Color.Transparent
                                     )
                                 )
                             )
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     content()
                 }
             }

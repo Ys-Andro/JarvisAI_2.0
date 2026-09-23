@@ -36,8 +36,11 @@ import com.example.jarvisai.ui.theme.JarvisSurfaceVariant
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
 
+import androidx.compose.material.icons.filled.Smartphone
+
 enum class SettingsCategory(val title: String, val icon: ImageVector) {
     ALL("Todos", Icons.Default.AllInclusive),
+    DEVICE_CONTROL("Control Dispositivo", Icons.Default.Smartphone),
     MODELS_API("Modelos & API", Icons.Default.Key),
     AGENTS("Personalidad", Icons.Default.SmartToy),
     PARAMETERS("Parámetros", Icons.Default.Tune),

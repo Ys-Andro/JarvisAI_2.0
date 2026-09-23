@@ -80,6 +80,13 @@ fun MessageBubble(
     val clipboardManager = LocalClipboardManager.current
     var isCopied by remember { mutableStateOf(false) }
 
+    val hasAction = !isUser && message.content.contains("[JARVIS_ACTION:")
+    val displayContent = if (hasAction) {
+        message.content.replace(Regex("\\[JARVIS_ACTION:[^\\]]+\\]"), "").trim()
+    } else {
+        message.content
+    }
+
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     val formattedTime = timeFormat.format(Date(message.timestamp))
 
@@ -225,14 +232,37 @@ fun MessageBubble(
                     }
 
                     // Message Content or Streaming Dots
-                    if (message.content.isEmpty() && message.isStreaming) {
+                    if (displayContent.isEmpty() && message.isStreaming) {
                         GeneratingDotsIndicator()
                     } else {
                         SimpleMarkdownText(
-                            content = message.content,
+                            content = displayContent,
                             textColor = if (isUser) Color(0xFFF9FBFD) else JarvisTextPrimary,
                             fontSize = 15
                         )
+                    }
+
+                    // Action badge if Jarvis executed hardware command
+                    if (hasAction) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(JarvisPrimary.copy(alpha = 0.12f))
+                                .border(1.dp, JarvisPrimary.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(text = "⚡", fontSize = 11.sp)
+                            Text(
+                                text = "JARVIS COMANDO HARDWARE EJECUTADO",
+                                color = JarvisPrimary,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     // Telemetry & metrics for Assistant answers
@@ -291,7 +321,7 @@ fun MessageBubble(
                     // Copy action button
                     Surface(
                         onClick = {
-                            clipboardManager.setText(AnnotatedString(message.content))
+                            clipboardManager.setText(AnnotatedString(displayContent))
                             isCopied = true
                         },
                         shape = RoundedCornerShape(4.dp),
@@ -322,7 +352,7 @@ fun MessageBubble(
                     // TTS Voice synthesis button
                     Surface(
                         onClick = {
-                            if (isSpeaking) onStopSpeakClick() else onSpeakClick(message.content)
+                            if (isSpeaking) onStopSpeakClick() else onSpeakClick(displayContent)
                         },
                         shape = RoundedCornerShape(4.dp),
                         color = if (isSpeaking) JarvisPrimary.copy(alpha = 0.15f) else Color.Transparent

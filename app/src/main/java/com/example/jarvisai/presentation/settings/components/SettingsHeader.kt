@@ -77,7 +77,7 @@ fun SettingsHeader(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -95,9 +95,9 @@ fun SettingsHeader(
                         JarvisPrimary.copy(alpha = 0.2f)
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(14.dp)
             )
-            .padding(16.dp)
+            .padding(12.dp)
     ) {
         Column {
             // Top HUD row
@@ -110,44 +110,44 @@ fun SettingsHeader(
                     // Arc reactor glowing status indicator
                     Box(
                         modifier = Modifier
-                            .size(12.dp)
+                            .size(10.dp)
                             .clip(CircleShape)
                             .background(JarvisAccentGreen.copy(alpha = pulseAlpha))
                             .border(1.dp, JarvisAccentGreen, CircleShape)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "JARVIS CORE ONLINE",
                         color = JarvisAccentGreen,
-                        fontSize = 11.sp,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.sp
+                        letterSpacing = 0.8.sp
                     )
                 }
 
                 Surface(
                     color = JarvisPrimary.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(4.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.4f))
                 ) {
                     Text(
-                        text = "v2.5 ARCHITECTURE",
+                        text = "v2.5 ARCH",
                         color = JarvisPrimaryLight,
-                        fontSize = 9.sp,
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Stat Badges Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 TelemetryStatCard(
                     icon = Icons.Default.Memory,
@@ -166,11 +166,11 @@ fun SettingsHeader(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 TelemetryStatCard(
                     icon = Icons.Default.VpnKey,
@@ -182,7 +182,7 @@ fun SettingsHeader(
 
                 TelemetryStatCard(
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    label = "VOZ AUTOMÁTICA",
+                    label = "VOZ AUTO",
                     value = if (uiState.settings.autoTts) "Habilitada" else "Manual",
                     highlightColor = if (uiState.settings.autoTts) JarvisAccentGreen else JarvisTextSecondary,
                     modifier = Modifier.weight(1f)
